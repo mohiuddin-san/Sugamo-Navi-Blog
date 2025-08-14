@@ -3,28 +3,33 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "react-router build",
-    "dev": "react-router dev",
-    "start": "react-router-serve ./build/server/index.js",
-    "typecheck": "react-router typegen && tsc"
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc"
   },
   "dependencies": {
-    "@react-router/node": "^7.7.1",
-    "@react-router/serve": "^7.7.1",
-    "isbot": "^5.1.27",
+    "@emotion/css": "^11.13.5",
+    "re-resizable": "^6.11.2",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "react-router": "^7.7.1"
+    "react-draggable": "^4.5.0",
+    "react-resizable": "^3.0.5",
+    "react-router-dom": "^6.22.1",
+    "rehype-raw": "^7.0.0",
+    "slate": "^0.118.0",
+    "slate-history": "^0.113.1",
+    "slate-react": "^0.117.4"
   },
   "devDependencies": {
-    "@react-router/dev": "^7.7.1",
-    "@tailwindcss/vite": "^4.1.4",
-    "@types/node": "^20",
     "@types/react": "^19.1.2",
     "@types/react-dom": "^19.1.2",
-    "tailwindcss": "^4.1.4",
+    "@vitejs/plugin-react": "^4.2.1",
+    "highlight.js": "^11.7.0",
+    "react-markdown": "^8.0.7",
+    "rehype-highlight": "^5.0.2",
+    "remark-gfm": "^3.0.1",
     "typescript": "^5.8.3",
-    "vite": "^6.3.3",
-    "vite-tsconfig-paths": "^5.1.4"
+    "vite": "^5.2.8"
   }
 }

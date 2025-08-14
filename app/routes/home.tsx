@@ -1,13 +1,22 @@
-import type { Route } from "./+types/home";
-import { Welcome } from "../welcome/welcome";
+import { useState } from "react";
+import { BlogList } from "~/components/BlogList";
+import { Editor } from "~/components/Editor";
+import { TableOfContents } from "~/components/TableOfContents";
 
-export function meta({}: Route.MetaArgs) {
-  return [
-    { title: "New React Router App" },
-    { name: "description", content: "Welcome to React Router!" },
-  ];
-}
+export default function BlogHome() {
+  const [headings, setHeadings] = useState([]);
 
-export default function Home() {
-  return <Welcome />;
+  return (
+    <div className="flex h-screen">
+      <div className="w-1/5 border-r p-4 overflow-y-auto">
+        <BlogList />
+      </div>
+      <div className="w-3/5 border-r p-4 overflow-y-auto">
+        <Editor onHeadingsChange={setHeadings} />
+      </div>
+      <div className="w-1/5 p-4 overflow-y-auto">
+        <TableOfContents headings={headings} />
+      </div>
+    </div>
+  );
 }
