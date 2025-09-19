@@ -1,3 +1,4 @@
+// app/components/EnhancedTableOfContents.jsx
 import { useMemo } from "react";
 
 type Heading = {
@@ -13,9 +14,10 @@ type TableOfContentsProps = {
   headings: Heading[];
   onHeadingClick: (position: number, id: string) => void;
   isPreview: boolean;
+  content: string;
 };
 
-export function TableOfContents({ headings, onHeadingClick, isPreview }: TableOfContentsProps) {
+export default function EnhancedTableOfContents({ headings, onHeadingClick, isPreview, content }: TableOfContentsProps) {
   // Build a hierarchical structure of headings
   const tocItems = useMemo(() => {
     const result: Heading[] = [];
@@ -45,6 +47,15 @@ export function TableOfContents({ headings, onHeadingClick, isPreview }: TableOf
     return result;
   }, [headings]);
 
+  // Calculate the actual scroll position in the preview
+  const calculateScrollPosition = (position: number) => {
+    if (!isPreview) return position;
+    
+    // For preview mode, we need to account for the title being added
+    const titleOffset = `# ${content.split('\n')[0]}\n`.length;
+    return position + titleOffset;
+  };
+
   // Render the TOC items recursively
   const renderTocItems = (items: Heading[]) => {
     return items.map((item) => (
@@ -55,7 +66,7 @@ export function TableOfContents({ headings, onHeadingClick, isPreview }: TableOf
       >
         <button
           className="toc-link"
-          onClick={() => onHeadingClick(item.position, item.id)}
+          onClick={() => onHeadingClick(calculateScrollPosition(item.position), item.id)}
         >
           {item.text}
         </button>

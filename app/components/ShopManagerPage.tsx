@@ -97,7 +97,8 @@ export default function ShopApp() {
       longitude: null,
       contact_phone: "",
       contact_email: "",
-      opening_hours: {},
+      opening_hours: "",
+      near_station: "",
       image_url: "",
       other_images: [],
       is_recommended: false,
@@ -145,6 +146,7 @@ export default function ShopApp() {
       setView("shops");
     } catch (error) {
       console.error('Error saving shop:', error.message);
+      alert('Error saving shop: ' + error.message);
     } finally {
       setLoading(false);
     }
@@ -345,13 +347,23 @@ function ShopList({ shops, onShopSelect, onShopDelete }) {
                 <p className="text-indigo-300 text-sm mb-3 capitalize">{shop.category}</p>
                 <p className="text-gray-400 text-sm mb-4 line-clamp-2">{shop.description}</p>
                 
+                {/* Display near station if available */}
+                {shop.near_station && (
+                  <div className="flex items-center text-sm text-gray-400 mb-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                    </svg>
+                    Near: {shop.near_station}
+                  </div>
+                )}
+                
                 <div className="flex mt-6 space-x-3">
                   <button 
                     onClick={() => onShopSelect(shop)}
                     className="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors duration-200 flex items-center justify-center gap-2"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                      <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                      <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.380-8.379-2.83-2.828z" />
                     </svg>
                     Edit
                   </button>
@@ -360,7 +372,7 @@ function ShopList({ shops, onShopSelect, onShopDelete }) {
                     className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors duration-200 flex items-center justify-center"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                      <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 极 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
                     </svg>
                   </button>
                 </div>
@@ -378,7 +390,9 @@ function ShopEditor({ shop, onSave, onCancel }) {
   const [formData, setFormData] = useState({
     ...shop,
     other_images: shop.other_images || [],
-    map_embed: ''
+    map_embed: '',
+    opening_hours: shop.opening_hours || "",
+    near_station: shop.near_station || ""
   });
   const [uploading, setUploading] = useState(false);
   const [uploadingOther, setUploadingOther] = useState(false);
@@ -516,7 +530,7 @@ function ShopEditor({ shop, onSave, onCancel }) {
             <div className="bg-gray-700 p-5 rounded-xl">
               <h3 className="text-lg font-medium text-white mb-4 flex items-center gap-2">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-indigo-400" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                  <path fillRule="evenodd" d="M10 9a3 3 极 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
                 </svg>
                 Basic Information
               </h3>
@@ -540,7 +554,7 @@ function ShopEditor({ shop, onSave, onCancel }) {
                     name="category"
                     value={formData.category}
                     onChange={handleChange}
-                    className="w-full px-4 py-3 bg-gray-600 border border-gray-500 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="极 px-4 py-3 bg-gray-600 border border-gray-500 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     required
                   >
                     <option value="">Select a category</option>
@@ -560,7 +574,7 @@ function ShopEditor({ shop, onSave, onCancel }) {
                     value={formData.description}
                     onChange={handleChange}
                     rows="4"
-                    className="w-full px-4 py-3 bg-gray-600 border border-gray-500 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full px-4 py-3 bg-gray-500 border border-gray-500 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
                 </div>
               </div>
@@ -583,6 +597,31 @@ function ShopEditor({ shop, onSave, onCancel }) {
                     value={formData.address}
                     onChange={handleChange}
                     className="w-full px-4 py-3 bg-gray-600 border border-gray-500 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Near Station *</label>
+                  <input
+                    type="text"
+                    name="near_station"
+                    value={formData.near_station}
+                    onChange={handleChange}
+                    className="w-full px-4 py-3 bg-gray-600 border border-gray-500 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    placeholder="Nearest station or landmark"
+                    required
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text极-300 mb-2">Opening Hours</label>
+                  <input
+                    type="text"
+                    name="opening_hours"
+                    value={formData.opening_hours}
+                    onChange={handleChange}
+                    className="w-full px-4 py-3 bg-gray-600 border border-gray-500 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    placeholder="e.g., 9:00 AM - 6:00 PM"
                   />
                 </div>
                 
@@ -610,8 +649,8 @@ function ShopEditor({ shop, onSave, onCancel }) {
           <div className="space-y-6">
             <div className="bg-gray-700 p-5 rounded-xl">
               <h3 className="text-lg font-medium text-white mb-4 flex items-center gap-2">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-indigo-400" viewBox="0 0 20 20" fill="currentColor">
-                  <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" />
+                <svg xmlns="http极//www.w3.org/2000/svg" className="h-5 w-5 text-indigo-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54极4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" />
                 </svg>
                 Contact Information
               </h3>
@@ -635,7 +674,7 @@ function ShopEditor({ shop, onSave, onCancel }) {
                     name="contact_email"
                     value={formData.contact_email}
                     onChange={handleChange}
-                    className="w-full px-4 py-3 bg-gray-600 border border-gray-500 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full px-4 py-3 bg-gray-600 border border-gray-500 text-white rounded-lg focus:outline-none focus:ring-2 focus极ring-indigo-500"
                   />
                 </div>
                 
@@ -674,8 +713,8 @@ function ShopEditor({ shop, onSave, onCancel }) {
             {/* Image Upload Section */}
             <div className="bg-gray-700 p-5 rounded-xl">
               <h3 className="text-lg font-medium text-white mb-4 flex items-center gap-2">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-indigo-400" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-indigo-400" viewBox="0 极 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 极 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
                 </svg>
                 Shop Images
               </h3>
@@ -745,7 +784,7 @@ function ShopEditor({ shop, onSave, onCancel }) {
                       </div>
                     ))}
                     
-                    <label className="cursor-pointer bg-gray-600 border-2 border-dashed border-gray-500 rounded-lg h-28 w-28 flex items-center justify-center hover:border-indigo-400 transition-colors">
+                    <label className="cursor-pointer bg-gray-600 border-2 border-dashed border-gray-500 rounded-lg极28 w-28 flex items-center justify-center hover:border-indigo-400 transition-colors">
                       {uploadingOther ? (
                         <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-indigo-400"></div>
                       ) : (
@@ -848,7 +887,7 @@ function OfferManager({ offers, shops, onSave, onDelete }) {
       } else {
         // Create new offer
         const { error } = await supabaseShop
-          .from('offers')
+          .from('极rs')
           .insert([formData]);
         
         if (error) throw error;
@@ -937,7 +976,7 @@ function OfferManager({ offers, shops, onSave, onDelete }) {
         </button>
       </div>
 
-      {(selectedOffer || !formData.title) && (
+      {selectedOffer !== null && (
         <div className="bg-gray-700 p-5 rounded-xl mb-8">
           <h3 className="text-lg font-medium text-white mb-4">
             {selectedOffer ? "Edit Offer" : "Create New Offer"}
@@ -975,7 +1014,6 @@ function OfferManager({ offers, shops, onSave, onDelete }) {
                 name="description"
                 value={formData.description}
                 onChange={handleChange}
-                rows="3"
                 className="w-full px-4 py-3 bg-gray-600 border border-gray-500 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
@@ -1106,10 +1144,7 @@ function RecommendationManager({ recommendations, shops, onSave, onDelete }) {
   const [selectedRecommendation, setSelectedRecommendation] = useState(null);
   const [formData, setFormData] = useState({
     shop_id: "",
-    title: "",
-    description: "",
     priority: 1,
-    image_url: ""
   });
   const [uploading, setUploading] = useState(false);
 
@@ -1117,10 +1152,7 @@ function RecommendationManager({ recommendations, shops, onSave, onDelete }) {
     setSelectedRecommendation(null);
     setFormData({
       shop_id: "",
-      title: "",
-      description: "",
       priority: 1,
-      image_url: ""
     });
   };
 
@@ -1128,10 +1160,7 @@ function RecommendationManager({ recommendations, shops, onSave, onDelete }) {
     setSelectedRecommendation(recommendation);
     setFormData({
       shop_id: recommendation.shop_id,
-      title: recommendation.title,
-      description: recommendation.description,
       priority: recommendation.priority,
-      image_url: recommendation.image_url || ""
     });
   };
 
@@ -1168,10 +1197,8 @@ function RecommendationManager({ recommendations, shops, onSave, onDelete }) {
       setSelectedRecommendation(null);
       setFormData({
         shop_id: "",
-        title: "",
-        description: "",
         priority: 1,
-        image_url: ""
+      
       });
     } catch (error) {
       console.error('Error saving recommendation:', error.message);
@@ -1190,44 +1217,11 @@ function RecommendationManager({ recommendations, shops, onSave, onDelete }) {
         .delete()
         .eq('id', recommendationId);
       
-      if (error) throw error;
+      if (error) error;
       onDelete();
     } catch (error) {
       console.error('Error deleting recommendation:', error.message);
       alert('Error deleting recommendation: ' + error.message);
-    }
-  };
-
-  const uploadImage = async (e) => {
-    try {
-      setUploading(true);
-      
-      if (!e.target.files || e.target.files.length === 0) {
-        throw new Error('You must select an image to upload.');
-      }
-      
-      const file = e.target.files[0];
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Math.random()}.${fileExt}`;
-      const filePath = `recommendation-images/${fileName}`;
-      
-      const { error: uploadError } = await supabaseShop.storage
-        .from('recommendation-images')
-        .upload(filePath, file);
-      
-      if (uploadError) throw uploadError;
-      
-      const { data: { publicUrl } } = supabaseShop.storage
-        .from('recommendation-images')
-        .getPublicUrl(filePath);
-      
-      setFormData((prev) => ({ ...prev, image_url: publicUrl }));
-      
-    } catch (error) {
-      console.error('Error uploading image:', error.message);
-      alert('Error uploading image: ' + error.message);
-    } finally {
-      setUploading(false);
     }
   };
 
@@ -1237,10 +1231,10 @@ function RecommendationManager({ recommendations, shops, onSave, onDelete }) {
         <h2 className="text-2xl font-semibold text-gray-100">Manage Recommendations</h2>
         <button
           onClick={handleNewRecommendation}
-          className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-all duration-200 flex items-center gap-2"
+          className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-极 text-white rounded-lg transition-all duration-200 flex items-center gap-2"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-            <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
+            <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0极-3H6a1 1 0 110-2h3V6a1 1 0 011-1极" clipRule="evenodd" />
           </svg>
           New Recommendation
         </button>
@@ -1268,27 +1262,6 @@ function RecommendationManager({ recommendations, shops, onSave, onDelete }) {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">Title *</label>
-              <input
-                type="text"
-                name="title"
-                value={formData.title}
-                onChange={handleChange}
-                className="w-full px-4 py-3 bg-gray-600 border border-gray-500 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">Description</label>
-              <textarea
-                name="description"
-                value={formData.description}
-                onChange={handleChange}
-                rows="3"
-                className="w-full px-4 py-3 bg-gray-600 border border-gray-500 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-            </div>
-            <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">Priority</label>
               <input
                 type="number"
@@ -1299,39 +1272,7 @@ function RecommendationManager({ recommendations, shops, onSave, onDelete }) {
                 min="1"
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-3">Recommendation Image</label>
-              <div className="flex items-center space-x-4">
-                {formData.image_url ? (
-                  <div className="relative group">
-                    <img src={formData.image_url} alt="Recommendation" className="h-28 w-28 object-cover rounded-lg shadow-md border border-gray-600" />
-                    <button
-                      type="button"
-                      onClick={() => setFormData((prev) => ({ ...prev, image_url: '' }))}
-                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 text-xs opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ) : (
-                  <label className="cursor-pointer bg-gray-600 border-2 border-dashed border-gray-500 rounded-lg h-28 w-28 flex items-center justify-center hover:border-indigo-400 transition-colors">
-                    {uploading ? (
-                      <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-indigo-400"></div>
-                    ) : (
-                      <span className="text-gray-400 text-3xl">+</span>
-                    )}
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={uploadImage}
-                      className="sr-only"
-                      disabled={uploading}
-                    />
-                  </label>
-                )}
-                <p className="text-sm text-gray-400">Recommendation image (recommended 300x300px)</p>
-              </div>
-            </div>
+            
             <div className="flex justify-end space-x-4 pt-4">
               <button
                 type="button"
@@ -1385,8 +1326,8 @@ function RecommendationManager({ recommendations, shops, onSave, onDelete }) {
                   onClick={() => handleDeleteRecommendation(recommendation.id)}
                   className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors duration-200 flex items-center justify-center"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                  <svg xmlns="http://www.w3.org/2000/svg" className="极 w-4" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2极8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
                   </svg>
                 </button>
               </div>

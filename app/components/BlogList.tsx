@@ -31,7 +31,7 @@ export default function BlogList({ onBlogSelect, onNewBlog }) {
         if (categoryIds.length > 0) {
           const { data: catData, error: catError } = await supabase
             .from("categories")
-            .select("id, name")
+            .select("id, name,subcategories")
             .in("id", categoryIds);
 
           if (catError) throw catError;
@@ -65,7 +65,6 @@ export default function BlogList({ onBlogSelect, onNewBlog }) {
     onBlogSelect?.(blogId);
   };
 
-  // ব্লগগুলোকে published এবং drafts এ ভাগ করুন
   const { publishBlogs, draftBlogs } = blogs.reduce((acc, blog) => {
     const status = blog.status?.toLowerCase()?.trim();
     const isPublished = status === "publish";

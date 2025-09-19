@@ -1,128 +1,226 @@
-import { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom'; // Import Link
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import TableOfContents from "~/components/TableOfContents";
+import Bloglist from "~/components/BlogList";
+import Editor from "~/components/Editor";
+import ShopManagerPage from "~/components/ShopManagerPage";
 import supabase from '~/supabase';
 
-export default function Login() {
-  const navigate = useNavigate();
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+type Heading = {
+  id: string;
+  text: string;
+  level: number;
+};
+
+type AppView = "blog-editor" | "shop-manager";
+
+function MainApp() {
+  const [headings, setHeadings] = useState<Heading[]>([]);
+  const [scrollPosition, setScrollPosition] = useState<number>(0);
+  const [isPreview, setIsPreview] = useState(false);
+  const [headingToScroll, setHeadingToScroll] = useState<string | null>(null);
+  const [selectedBlogId, setSelectedBlogId] = useState<string | null>(null);
+  const [currentView, setCurrentView] = useState<AppView>("blog-editor");
 
   useEffect(() => {
-    // Check for existing session and redirect
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) navigate('/app');
-    });
-  }, [navigate]);
+    console.log("Current view:", currentView);
+  }, [currentView]);
 
-  const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
+  const handleHeadingsChange = (newHeadings: Heading[]) => {
+    setHeadings(newHeadings);
+  };
 
-    const formData = new FormData(e.currentTarget);
-    const email = formData.get('email') as string;
-    const password = formData.get('password') as string;
-
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (error) {
-      setError(error.message);
-      setLoading(false);
-      return;
+  const handleHeadingClick = (position: number, id: string) => {
+    if (isPreview) {
+      setHeadingToScroll(id);
+    } else {
+      setScrollPosition(position);
     }
+  };
 
-    navigate('/app');
+  const handleBlogSelect = (blogId: string) => {
+    setSelectedBlogId(blogId);
+  };
+
+  const handleNewBlog = () => {
+    setSelectedBlogId("new");
+  };
+
+  const handleViewChange = (view: AppView) => {
+    console.log("handleViewChange called with view:", view);
+    setCurrentView(view);
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Sign in to your account
-          </h2>
+    <div className="flex h-screen bg-gray-50">
+      {/* Side Menu */}
+      <div className="w-64 bg-gray-800 text-white flex flex-col">
+        <div className="p-4 border-b border-gray-700">
+          <h2 className="text-lg font-bold">Admin Panel</h2>
         </div>
-        {error && (
-          <div className="rounded-md bg-red-50 p-4">
-            <div className="flex">
-              <div className="ml-3">
-                <h3 className="text-sm font-medium text-red-800">{error}</h3>
+        <nav className="flex-1 flex flex-col p-4 gap-2">
+          <button
+            className={`p-3 rounded flex items-center gap-2 ${
+              currentView === "blog-editor" 
+                ? "bg-blue-600 text-white" 
+                : "hover:bg-gray-700"
+            }`}
+            onClick={() => {
+              console.log("Blog Editor button clicked");
+              handleViewChange("blog-editor");
+            }}
+          >
+            <span>📝</span>
+            <span>Blog Editor</span>
+          </button>
+          <button
+            className={`p-3 rounded flex items-center gap-2 ${
+              currentView === "shop-manager" 
+                ? "bg-blue-600 text-white" 
+                : "hover:bg-gray-700"
+            }`}
+            onClick={() => {
+              console.log("Shop Manager button clicked"); 
+              handleViewChange("shop-manager");
+            }}
+          >
+            <span>🛍️</span>
+            <span>Shop Manager</span>
+          </button>
+          <div className="border-t border-gray-700 my-2"></div>
+          <button className="p-3 rounded flex items-center gap-2 hover:bg-gray-700">
+            <span>📊</span>
+            <span>Analytics</span>
+          </button>
+          <button className="p-3 rounded flex items-center gap-2 hover:bg-gray-700">
+            <span>⚙️</span>
+            <span>Settings</span>
+          </button>
+          <button 
+            className="p-3 rounded flex items-center gap-2 hover:bg-gray-700 mt-auto"
+            onClick={handleLogout}
+          >
+            <span>🚪</span>
+            <span>Logout</span>
+          </button>
+        </nav>
+      </div>
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="bg-white border-b p-4 flex gap-2 md:hidden">
+          <button
+            className={`p-2 rounded ${
+              currentView === "blog-editor" 
+                ? "bg-blue-500 text-white" 
+                : "bg-gray-200"
+            }`}
+            onClick={() => {
+              console.log("Mobile Blog Editor button clicked");
+              handleViewChange("blog-editor");
+            }}
+          >
+            Blog Editor
+          </button>
+          <button
+            className={`p-2 rounded ${
+              currentView === "shop-manager" 
+                ? "bg-blue-500 text-white" 
+                : "bg-gray-200"
+            }`}
+            onClick={() => {
+              console.log("Mobile Shop Manager button clicked");
+              handleViewChange("shop-manager");
+            }}
+          >
+            Shop Manager
+          </button>
+        </div>
+        <div className="flex-1 overflow-auto bg-white">
+          {currentView === "blog-editor" ? (
+            <div className="flex h-full">
+              <div className="w-full md:w-1/4 border-r overflow-auto bg-white">
+               <Bloglist 
+                  onBlogSelect={handleBlogSelect} 
+                  onNewBlog={handleNewBlog} 
+                />
+              </div>
+              <div className="hidden md:block md:w-2/4 overflow-auto bg-white">
+                <Editor
+                  onHeadingsChange={handleHeadingsChange}
+                  scrollToPosition={scrollPosition}
+                  onPreviewToggle={() => setIsPreview(!isPreview)}
+                  headingToScroll={headingToScroll}
+                  onHeadingScrolled={() => setHeadingToScroll(null)}
+                  blogId={selectedBlogId}
+                />
+              </div>
+              <div className="hidden md:block md:w-1/4 border-l overflow-auto bg-white">
+                <TableOfContents
+                  headings={headings}
+                  onHeadingClick={handleHeadingClick}
+                  isPreview={isPreview}
+                />
               </div>
             </div>
-          </div>
-        )}
-        <form className="mt-8 space-y-6" onSubmit={handleLogin}>
-          <div className="rounded-md shadow-sm -space-y-px">
-            <div>
-              <label htmlFor="email" className="sr-only">
-                Email address
-              </label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                autoComplete="email"
-                required
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                placeholder="Email address"
-              />
+          ) : (
+            <div className="h-full overflow-auto bg-white">
+              <ShopManagerPage />
             </div>
-            <div>
-              <label htmlFor="password" className="sr-only">
-                Password
-              </label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                autoComplete="current-password"
-                required
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                placeholder="Password"
-              />
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <input
-                id="remember-me"
-                name="remember-me"
-                type="checkbox"
-                className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-              />
-              <label
-                htmlFor="remember-me"
-                className="ml-2 block text-sm text-gray-900"
-              >
-                Remember me
-              </label>
-            </div>
-
-            <div className="text-sm">
-              <Link
-                to="/forgot-password"
-                className="font-medium text-indigo-600 hover:text-indigo-500"
-              >
-                Forgot your password?
-              </Link>
-            </div>
-          </div>
-
-          <div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
-            >
-              {loading ? 'Signing in...' : 'Sign in'}
-            </button>
-          </div>
-        </form>
+          )}
+        </div>
       </div>
     </div>
   );
+}
+
+export default function ProtectedApp() {
+  const navigate = useNavigate();
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Check for existing session
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        navigate('/login');
+      } else {
+        setIsAuthenticated(true);
+      }
+      setLoading(false);
+    };
+
+    checkAuth();
+
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (!session) {
+          navigate('/login');
+        } else {
+          setIsAuthenticated(true);
+        }
+        setLoading(false);
+      }
+    );
+
+    return () => subscription.unsubscribe();
+  }, [navigate]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Checking authentication...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return isAuthenticated ? <MainApp /> : null;
 }

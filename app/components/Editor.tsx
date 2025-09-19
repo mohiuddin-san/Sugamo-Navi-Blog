@@ -5,12 +5,10 @@ import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import rehypeRaw from "rehype-raw";
 import "highlight.js/styles/github.css";
-import { ResizableBox } from "react-resizable";
 import OGPPreview from "~/components/OGPPreview";
-import "react-resizable/css/styles.css";
 import supabase from "~/supabase";
-
-import { FiImage, FiX, FiUpload } from "react-icons/fi";
+import { FiImage, FiX, FiUpload, FiChevronDown, FiChevronUp } from "react-icons/fi";
+import { toString } from 'mdast-util-to-string';
 
 // Simple debounce function
 function debounce<T extends (...args: any[]) => void>(func: T, wait: number): (...args: Parameters<T>) => void {
@@ -38,6 +36,12 @@ type EditorProps = {
   blogId?: string | null;
 };
 
+type Category = {
+  id: string;
+  name: string;
+  subcategories?: { id: string; name: string }[];
+};
+
 export default function Editor({
   onHeadingsChange,
   scrollToPosition,
@@ -53,12 +57,6 @@ export default function Editor({
   const [activeBgColor, setActiveBgColor] = useState("#ffffff");
   const [urlForOGP, setUrlForOGP] = useState("");
   const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
-  const [selectedImageId, setSelectedImageId] = useState<string | null>(null);
-  const [selectedImageDimensions, setSelectedImageDimensions] = useState<{
-    width: number;
-    height: number;
-  } | null>(null);
-  const [imageLayout, setImageLayout] = useState<"single" | "side-by-side">("single");
   const [cursorPosition, setCursorPosition] = useState(0);
   const [cursorNode, setCursorNode] = useState<Node | null>(null);
   const [cursorOffset, setCursorOffset] = useState(0);
@@ -67,10 +65,16 @@ export default function Editor({
   const [blogId, setBlogId] = useState<string | null>(initialBlogId || null);
   const [topImage, setTopImage] = useState<string | null>(null);
   const [topImageFileName, setTopImageFileName] = useState<string | null>(null);
-  const [categoriesList, setCategoriesList] = useState<{ id: string; name: string }[]>([]);
+  const [categoriesList, setCategoriesList] = useState<Category[]>([]);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [selectedSubcategories, setSelectedSubcategories] = useState<string[]>([]);
   const [newCategory, setNewCategory] = useState("");
+  const [newSubcategory, setNewSubcategory] = useState("");
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+  const [showSubcategoryDropdown, setShowSubcategoryDropdown] = useState(false);
+  const [selectedCategoryForSubcategory, setSelectedCategoryForSubcategory] = useState<string | null>(null);
+  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
+  const [imageLayout, setImageLayout] = useState<"single" | "side-by-side">("single");
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
@@ -80,25 +84,33 @@ export default function Editor({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const topImageInputRef = useRef<HTMLInputElement>(null);
   const cursorRef = useRef<HTMLSpanElement | null>(null);
+  const categoryInputRef = useRef<HTMLInputElement>(null);
+  const subcategoryInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    console.log("Categories fetch useEffect running");
     const fetchCategories = async () => {
-      const { data, error } = await supabase
+      const { data: categoriesData, error: categoriesError } = await supabase
         .from("categories")
-        .select("id, name")
+        .select("id, name, subcategories")
         .order("name", { ascending: true });
-      if (error) {
-        console.error("Error fetching categories:", error);
-      } else {
-        setCategoriesList(data);
+
+      if (categoriesError) {
+        console.error("Error fetching categories:", categoriesError);
+        return;
       }
+
+      const categoriesWithSubcategories = categoriesData.map((category) => ({
+        ...category,
+        subcategories: category.subcategories || [],
+      }));
+
+      setCategoriesList(categoriesWithSubcategories);
     };
+
     fetchCategories();
   }, []);
 
   useEffect(() => {
-    console.log("Title extraction useEffect running", { content });
     if (content) {
       const h1Match = content.match(/^#\s+(.+)$/m);
       if (h1Match && !title) {
@@ -108,11 +120,11 @@ export default function Editor({
   }, [content, title]);
 
   useEffect(() => {
-    console.log("Blog fetch useEffect running", { initialBlogId, blogId });
     if (initialBlogId === null || initialBlogId === "new") {
       setContent("");
       setTitle("");
       setSelectedCategories([]);
+      setSelectedSubcategories([]);
       setTopImage(null);
       setTopImageFileName(null);
       setBlogId(null);
@@ -133,24 +145,22 @@ export default function Editor({
         setTopImage(data.top_image || null);
         setBlogId(initialBlogId);
 
-        const primaryCat = data.category_id ? [data.category_id] : [];
-        const { data: catData, error: catError } = await supabase
-          .from("blog_categories")
-          .select("category_id")
-          .eq("blog_id", initialBlogId);
-        if (catError) console.error("Fetch blog categories error:", catError);
-        else {
-          const allCatIds = [...primaryCat, ...catData.map((cat) => cat.category_id)];
-          if (allCatIds.length > 0) {
-            const { data: catNames, error: namesError } = await supabase
-              .from("categories")
-              .select("name")
-              .in("id", allCatIds);
-            if (namesError) console.error("Fetch category names error:", namesError);
-            else setSelectedCategories(catNames.map((cat) => cat.name));
-          } else {
-            setSelectedCategories([]);
+        if (data.category_id) {
+          const { data: categoryData, error: categoryError } = await supabase
+            .from("categories")
+            .select("name, subcategories")
+            .eq("id", data.category_id)
+            .single();
+          if (categoryError) {
+            console.error("Fetch category error:", categoryError);
+            alert("Failed to fetch category: " + categoryError.message);
+            return;
           }
+          setSelectedCategories(categoryData.name ? [categoryData.name] : []);
+          setSelectedSubcategories((categoryData.subcategories || []).map((sub: { name: string }) => sub.name));
+        } else {
+          setSelectedCategories([]);
+          setSelectedSubcategories([]);
         }
       };
       fetchBlog();
@@ -160,8 +170,6 @@ export default function Editor({
   const togglePreview = useCallback(() => {
     const newPreviewState = !isPreview;
     setIsPreview(newPreviewState);
-    setSelectedImageId(null);
-    setSelectedImageDimensions(null);
     setCursorNode(null);
     setCursorOffset(0);
     if (onPreviewToggle) {
@@ -188,7 +196,7 @@ export default function Editor({
         setCursorOffset(range.startOffset);
 
         let targetElement: HTMLElement | null = range.startContainer.parentElement;
-        while (targetElement && !["P", "H1", "H2", "H3", "H4", "H5", "H6"].includes(targetElement.tagName)) {
+        while (targetElement && !["P", "H1", "H2", "H3", "H4", "H5", "H6", "DIV"].includes(targetElement.tagName)) {
           targetElement = targetElement.parentElement;
         }
 
@@ -246,8 +254,7 @@ export default function Editor({
 
     const position = isPreview ? cursorPosition : textareaRef.current ? textareaRef.current.selectionStart : content.length;
 
-    let newContent = content;
-    let imageMarkdowns: string[] = [];
+    let imageHtmls: string[] = [];
 
     for (const [index, file] of validFiles.entries()) {
       const uploaded = await uploadImageToSupabase(file);
@@ -256,48 +263,25 @@ export default function Editor({
       const { url, fileName } = uploaded;
       const imageId = Math.random().toString(36).substring(2, 9);
 
-      const img = new Image();
-      img.src = url;
-      await new Promise((resolve) => { img.onload = resolve; });
-
-      let initWidth = img.width;
-      let initHeight = img.height;
-
-      if (layout === "single") {
-        const maxWidth = 800;
-        if (initWidth > maxWidth) {
-          initHeight = (maxWidth / initWidth) * initHeight;
-          initWidth = maxWidth;
-        }
-      } else {
-        const targetWidth = 300;
-        initHeight = (targetWidth / initWidth) * initHeight;
-        initWidth = targetWidth;
-      }
-
-      initWidth = Math.round(initWidth);
-      initHeight = Math.round(initHeight);
-
       const params = new URLSearchParams({
         id: imageId,
-        width: initWidth.toString(),
-        height: initHeight.toString(),
-        align: "none",
         fileName,
       });
 
-      const imageMd = `![image ${index + 1}](${url}?${params.toString()})`;
-      imageMarkdowns.push(imageMd);
+      const imageHtml = `<img src="${url}?${params.toString()}" alt="Image ${index + 1}" style="width: 100%; height: auto; margin: 10px 0;" />`;
+      imageHtmls.push(imageHtml);
     }
 
-    let combinedMarkdown = "";
-    if (layout === "side-by-side" && imageMarkdowns.length > 1) {
-      combinedMarkdown = `[side-by-side: ${imageMarkdowns.join("|")}]`;
+    let combinedHtml = "";
+    if (layout === "side-by-side" && imageHtmls.length > 1) {
+      combinedHtml = `<div style="display: flex; flex-direction: row; gap: 10px; margin: 10px 0; width: 100%;">
+${imageHtmls.map(html => `<div style="flex: 1;">${html}</div>`).join("\n")}
+</div>`;
     } else {
-      combinedMarkdown = imageMarkdowns.join("\n\n");
+      combinedHtml = imageHtmls.join("\n");
     }
 
-    newContent = content.substring(0, position) + combinedMarkdown + content.substring(position);
+    const newContent = content.substring(0, position) + "\n" + combinedHtml + "\n" + content.substring(position);
     setContent(newContent);
     setCursorNode(null);
     setCursorOffset(0);
@@ -306,8 +290,8 @@ export default function Editor({
       setTimeout(() => {
         if (textareaRef.current) {
           textareaRef.current.focus();
-          textareaRef.current.selectionStart = position + combinedMarkdown.length;
-          textareaRef.current.selectionEnd = position + combinedMarkdown.length;
+          textareaRef.current.selectionStart = position + combinedHtml.length + 2;
+          textareaRef.current.selectionEnd = position + combinedHtml.length + 2;
         }
       }, 0);
     }
@@ -347,53 +331,28 @@ export default function Editor({
     [content, isPreview]
   );
 
-  const debouncedUpdateImageInContent = useCallback(
-    debounce((id: string, updates: { [key: string]: string | number }) => {
-      if (previewRef.current && isPreview) {
-        scrollRef.current = previewRef.current.scrollTop;
-      }
-
-      const regex = /!\[([^\]]*)\]\(([^)]+)\)/g;
-      let newContent = content;
-      let match;
-      while ((match = regex.exec(content)) !== null) {
-        const fullMatch = match[0];
-        const alt = match[1];
-        const urlStr = match[2];
-        const [baseUrl, paramStr] = urlStr.split("?");
-        if (!paramStr) continue;
-        const params = new URLSearchParams(paramStr);
-        if (params.get("id") === id) {
-          Object.entries(updates).forEach(([key, value]) => {
-            params.set(key, value.toString());
-          });
-          const newUrlStr = `${baseUrl}?${params.toString()}`;
-          const newFull = `![${alt}](${newUrlStr})`;
-          newContent = newContent.slice(0, match.index) + newFull + newContent.slice(match.index + fullMatch.length);
-          break;
-        }
-      }
-      setContent(newContent);
-    }, 300),
-    [content, isPreview]
-  );
-
   const removeImage = async (id: string) => {
     if (previewRef.current && isPreview) {
       scrollRef.current = previewRef.current.scrollTop;
     }
-    const regex = /!\[([^\]]*)\]\(([^)]+)\)/g;
+    const regex = /<img[^>]+id=([^>\s]+)/g;
     let newContent = content;
     let fileNameToDelete = null;
+    let match;
     while ((match = regex.exec(content)) !== null) {
       const fullMatch = match[0];
-      const urlStr = match[2];
+      const urlStr = match[0].match(/src="([^"]+)"/)?.[1] || "";
       const [, paramStr] = urlStr.split("?");
       if (!paramStr) continue;
       const params = new URLSearchParams(paramStr);
       if (params.get("id") === id) {
         fileNameToDelete = params.get("fileName");
-        newContent = newContent.slice(0, match.index) + newContent.slice(match.index + fullMatch.length);
+        newContent = newContent.replace(fullMatch, "");
+        const divRegex = /<div[^>]+>[\s\S]*?(<img[^>]+id=[^>]+>)[\s\S]*?<\/div>/g;
+        newContent = newContent.replace(divRegex, (divMatch, imgMatch) => {
+          if (imgMatch.includes(`id=${id}`)) return "";
+          return divMatch;
+        });
         break;
       }
     }
@@ -402,8 +361,6 @@ export default function Editor({
       if (error) console.error("Delete error:", error);
     }
     setContent(newContent);
-    setSelectedImageId(null);
-    setSelectedImageDimensions(null);
     setCursorNode(null);
     setCursorOffset(0);
   };
@@ -521,8 +478,8 @@ export default function Editor({
         break;
       case "insertImage":
         const imageId = Math.random().toString(36).substring(2, 9);
-        newContent = `${content.substring(0, start)}![${selectedText || "image"}](${value}?id=${imageId}&width=400&height=300&align=none)${content.substring(end)}`;
-        newCursorPos = end + 13 + (value?.length || 0) + imageId.length + 13;
+        newContent = `${content.substring(0, start)}<img src="${value}?id=${imageId}" alt="${selectedText || "image"}" style="width: 100%; height: auto; margin: 10px 0;" />${content.substring(end)}`;
+        newCursorPos = end + value!.length + imageId.length + 38;
         break;
       case "insertText":
         newContent = `${content.substring(0, start)}${value}${content.substring(end)}`;
@@ -549,91 +506,164 @@ export default function Editor({
     }, 0);
   };
 
-  const getOrCreateCategoryIds = async (categoryNames: string[]) => {
-    const categoryIds: string[] = [];
-    for (const catName of categoryNames) {
-      if (!catName) continue;
-      const { data: existing, error: findError } = await supabase
+const saveBlog = async (status: "draft" | "publish", date?: string) => {
+  if (!title) {
+    alert("Please enter a title");
+    return;
+  }
+
+  if (selectedCategories.length === 0 && !newCategory.trim()) {
+    alert("Please select or add at least one category");
+    return;
+  }
+
+  // Check if user is authenticated
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) {
+    alert("You must be logged in to save a blog");
+    console.error("Auth error:", authError);
+    return;
+  }
+  console.log("Authenticated User ID:", user.id);
+
+  // Get or create category
+  const allCategories = [...selectedCategories, newCategory.trim()].filter(
+    (cat, index, self) => cat && self.indexOf(cat) === index
+  );
+  const allSubcategories = [...selectedSubcategories, newSubcategory.trim()].filter(
+    (subcat, index, self) => subcat && self.indexOf(subcat) === index
+  );
+  console.log("Saving categories:", allCategories, "Subcategories:", allSubcategories);
+
+  let categoryId: number | null = null;
+  if (allCategories.length > 0) {
+    const primaryCategory = allCategories[0];
+    console.log("Processing category:", primaryCategory);
+    const { data: existingCategory, error: findError } = await supabase
+      .from("categories")
+      .select("id, subcategories")
+      .eq("name", primaryCategory)
+      .maybeSingle();  // Changed to .maybeSingle() to handle 0 rows gracefully
+
+    if (findError) {
+      console.error("Category fetch error:", findError);
+      alert("Failed to fetch category: " + findError.message);
+      return;
+    }
+
+    if (existingCategory) {
+      categoryId = existingCategory.id;
+      console.log("Existing category ID:", categoryId, "Current subcategories:", existingCategory.subcategories);
+      // Always update subcategories, even if empty
+      const existingSubcategories = Array.isArray(existingCategory.subcategories) ? existingCategory.subcategories : [];
+      const newSubcategories = allSubcategories
+        .filter(name => !existingSubcategories.some((sub: { name: string }) => sub.name === name))
+        .map((name, index) => ({
+          id: `${categoryId}-${index}-${Date.now()}`,
+          name,
+        }));
+      const updatedSubcategories = [...existingSubcategories, ...newSubcategories];
+      console.log("Updating subcategories to:", updatedSubcategories);
+
+      const { error: updateError } = await supabase
         .from("categories")
-        .select("id")
-        .eq("name", catName)
-        .single();
-      if (findError && findError.code !== "PGRST116") {
-        console.error("Category fetch error:", findError);
-        alert("Failed to fetch category");
-        return null;
+        .update({ subcategories: updatedSubcategories.length > 0 ? updatedSubcategories : [] })
+        .eq("id", categoryId);
+      if (updateError) {
+        console.error("Subcategory update error:", updateError);
+        alert("Failed to update subcategories: " + updateError.message);
+        return;
       }
-      if (existing) {
-        categoryIds.push(existing.id);
-        continue;
-      }
+      console.log("Subcategories updated successfully for category ID:", categoryId);
+    } else {
+      // No existing category, create new one
+      const newSubcategories = allSubcategories.map((name, index) => ({
+        id: `new-${index}-${Date.now()}`,
+        name,
+      }));
+      console.log("Creating new category:", primaryCategory, "with subcategories:", newSubcategories);
       const { data: newCat, error: insertError } = await supabase
         .from("categories")
-        .insert([{ name: catName }])
+        .insert([{ name: primaryCategory, subcategories: newSubcategories.length > 0 ? newSubcategories : [] }])
         .select("id")
         .single();
       if (insertError) {
         console.error("Category insert error:", insertError);
-        alert("Failed to create category");
-        return null;
+        alert("Failed to create category: " + insertError.message);
+        return;
       }
-      categoryIds.push(newCat.id);
+      categoryId = newCat.id;
+      console.log("New category created with ID:", categoryId);
     }
-    return categoryIds;
+  }
+
+  const payload = {
+    title,
+    top_image: topImage || null,
+    details: content,
+    status,
+    publish_date: status === "publish" ? date : null,
+    user_id: user.id,
+    category_id: categoryId,
   };
+  console.log("Saving blog with payload:", payload);
 
-  const saveBlog = async (status: "draft" | "publish", date?: string) => {
-    if (!title) {
-      alert("Please enter a title");
-      return;
-    }
-    if (selectedCategories.length === 0 && !newCategory.trim()) {
-      alert("Please select or add at least one category");
-      return;
-    }
-
-    const allCategories = [...selectedCategories, newCategory.trim()].filter((cat, index, self) => cat && self.indexOf(cat) === index);
-    const categoryIds = await getOrCreateCategoryIds(allCategories);
-    if (!categoryIds || categoryIds.length === 0) return;
-
-    const payload = {
-      title,
-      top_image: topImage || null,
-      details: content,
-      status,
-      category_id: categoryIds[0], // Primary category
-      publish_date: status === "publish" ? date : null,
-    };
-
-    try {
-      let currentBlogId = blogId;
-      if (blogId) {
-        const { error } = await supabase.from("blogs").update(payload).eq("id", blogId);
-        if (error) throw error;
-        await supabase.from("blog_categories").delete().eq("blog_id", blogId); // Clear old additional categories
-        alert("Blog updated successfully!");
-      } else {
-        const { data, error } = await supabase.from("blogs").insert([payload]).select("id").single();
-        if (error) throw error;
-        currentBlogId = data.id;
-        setBlogId(currentBlogId);
-        alert("Blog saved successfully!");
+  try {
+    let currentBlogId = blogId;
+    if (blogId) {
+      // Update existing blog
+      const { error } = await supabase
+        .from("blogs")
+        .update(payload)
+        .eq("id", blogId)
+        .eq("user_id", user.id);
+      if (error) {
+        console.error("Update blog error:", error);
+        if (error.code === "42501") {
+          alert("You don't have permission to update this blog. Ensure you own this blog.");
+        } else if (error.message.includes("No API key found")) {
+          alert("API key is missing. Please check your Supabase configuration.");
+        } else {
+          alert("Failed to update blog: " + error.message);
+        }
+        return;
       }
-
-      const additionalCatIds = categoryIds.slice(1);
-      if (additionalCatIds.length > 0) {
-        const categoryEntries = additionalCatIds.map((catId) => ({ blog_id: currentBlogId, category_id: catId }));
-        const { error: catError } = await supabase.from("blog_categories").insert(categoryEntries);
-        if (catError) throw catError;
+      console.log("Blog updated successfully, Blog ID:", blogId);
+      alert("Blog updated successfully!");
+    } else {
+      // Create new blog
+      const { data, error } = await supabase
+        .from("blogs")
+        .insert([payload])
+        .select("id")
+        .single();
+      if (error) {
+        console.error("Insert blog error:", error);
+        if (error.message.includes("No API key found")) {
+          alert("API key is missing. Please check your Supabase configuration.");
+        } else if (error.code === "42501") {
+          alert("You don't have permission to create a blog.");
+        } else {
+          alert("Failed to save blog: " + error.message);
+        }
+        return;
       }
-      setSelectedCategories(allCategories.slice(0, -1));
-      setNewCategory("");
-    } catch (error) {
-      console.error("Save blog error:", error);
-      alert("Failed to save blog");
+      currentBlogId = data.id;
+      console.log("New Blog ID:", currentBlogId);
+      setBlogId(currentBlogId);
+      alert("Blog saved successfully!");
     }
-  };
 
+    setSelectedCategories(allCategories.slice(0, -1));
+    setSelectedSubcategories(allSubcategories.slice(0, -1));
+    setNewCategory("");
+    setNewSubcategory("");
+    setSelectedCategoryForSubcategory(null);
+  } catch (error: any) {
+    console.error("Save blog error:", error);
+    alert("An unexpected error occurred while saving the blog: " + (error.message || "Unknown error"));
+  }
+};
   const handleSaveDraft = () => {
     saveBlog("draft");
   };
@@ -652,52 +682,93 @@ export default function Editor({
     setPublishDate("");
   };
 
+  const toggleCategoryDropdown = () => {
+    setShowCategoryDropdown(!showCategoryDropdown);
+    setShowSubcategoryDropdown(false);
+  };
+
+  const selectCategory = (categoryName: string) => {
+    if (!selectedCategories.includes(categoryName)) {
+      setSelectedCategories([...selectedCategories, categoryName]);
+      setSelectedCategoryForSubcategory(categoriesList.find(cat => cat.name === categoryName)?.id || null);
+    }
+    setNewCategory("");
+    setShowCategoryDropdown(false);
+  };
+
+  const removeSelectedCategory = (categoryName: string) => {
+    setSelectedCategories(selectedCategories.filter(cat => cat !== categoryName));
+    // Remove subcategories associated with this category
+    const category = categoriesList.find(cat => cat.name === categoryName);
+    if (category && category.subcategories) {
+      const subcatNames = category.subcategories.map(sub => sub.name);
+      setSelectedSubcategories(selectedSubcategories.filter(sub => !subcatNames.includes(sub)));
+    }
+  };
+
+  const handleCategoryInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setNewCategory(e.target.value);
+  };
+
+  const handleCategoryKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && newCategory.trim() && !selectedCategories.includes(newCategory.trim())) {
+      setSelectedCategories([...selectedCategories, newCategory.trim()]);
+      setNewCategory("");
+      setShowCategoryDropdown(false);
+    } else if (e.key === 'Escape') {
+      setShowCategoryDropdown(false);
+      setNewCategory("");
+    }
+  };
+
+  const toggleSubcategoryDropdown = () => {
+    setShowSubcategoryDropdown(!showSubcategoryDropdown);
+    setShowCategoryDropdown(false);
+  };
+
+  const selectSubcategory = (subcategoryName: string) => {
+    if (!selectedSubcategories.includes(subcategoryName)) {
+      setSelectedSubcategories([...selectedSubcategories, subcategoryName]);
+    }
+    setNewSubcategory("");
+    setShowSubcategoryDropdown(false);
+  };
+
+  const removeSelectedSubcategory = (subcategoryName: string) => {
+    setSelectedSubcategories(selectedSubcategories.filter(subcat => subcat !== subcategoryName));
+  };
+
+  const handleSubcategoryInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setNewSubcategory(e.target.value);
+  };
+
+  const handleSubcategoryKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && newSubcategory.trim() && !selectedSubcategories.includes(newSubcategory.trim())) {
+      setSelectedSubcategories([...selectedSubcategories, newSubcategory.trim()]);
+      setNewSubcategory("");
+      setShowSubcategoryDropdown(false);
+    } else if (e.key === 'Escape') {
+      setShowSubcategoryDropdown(false);
+      setNewSubcategory("");
+    }
+  };
+
   const ImageComponent = memo(({ node, ...props }: any) => {
     const src = props.src || "";
     const [baseUrl, paramStr] = src.split("?");
     const params = new URLSearchParams(paramStr || "");
     const id = params.get("id") || "";
-    const width = parseInt(params.get("width") || "400", 10);
-    const height = parseInt(params.get("height") || "300", 10);
-    const align = params.get("align") || "none";
-
-    const isSelected = id === selectedImageId;
-
-    useEffect(() => {
-      console.log("ImageComponent useEffect running", { isSelected, width, height, selectedImageDimensions });
-      if (isSelected && (selectedImageDimensions?.width !== width || selectedImageDimensions?.height !== height)) {
-        setSelectedImageDimensions({ width, height });
-      }
-    }, [isSelected, width, height, selectedImageDimensions]);
+    const alt = props.alt || "Image";
 
     const containerStyle: React.CSSProperties = {
       position: "relative",
-      display: "inline-block",
-      maxWidth: "100%",
+      display: "block",
+      width: props.style?.width || "100%",
+      margin: "10px 0",
     };
 
-    if (align === "left") {
-      Object.assign(containerStyle, {
-        float: "left",
-        margin: "10px 20px 10px 0",
-        clear: "both",
-      });
-    } else if (align === "right") {
-      Object.assign(containerStyle, {
-        float: "right",
-        margin: "10px 0 10px 20px",
-        clear: "both",
-      });
-    } else if (align === "center") {
-      Object.assign(containerStyle, {
-        display: "block",
-        margin: "20px auto",
-        textAlign: "center",
-      });
-    }
-
     return (
-      <div className={`image-container align-${align}`} style={containerStyle}>
+      <div className="image-container" style={containerStyle}>
         <button
           onClick={() => removeImage(id)}
           style={{
@@ -715,143 +786,28 @@ export default function Editor({
         >
           Remove
         </button>
-        {isSelected && isPreview ? (
-          <ResizableBox
-            width={width}
-            height={height}
-            minConstraints={[50, 50]}
-            maxConstraints={[1200, 1200]}
-            lockAspectRatio={false}
-            resizeHandles={["s", "w", "e", "n", "sw", "se", "nw", "ne"]}
-            onResizeStop={(e, data) => {
-              const newWidth = Math.round(data.size.width);
-              const newHeight = Math.round(data.size.height);
-              debouncedUpdateImageInContent(id, {
-                width: newWidth,
-                height: newHeight,
-              });
-              setSelectedImageDimensions({
-                width: newWidth,
-                height: newHeight,
-              });
-            }}
-            className="resizable-image-box"
-          >
-            <img
-              src={baseUrl}
-              alt={props.alt || ""}
-              style={{
-                width: "100%",
-                height: "100%",
-                objectFit: "contain",
-                cursor: "move",
-                border: isSelected ? "2px dashed #3b82f6" : "none",
-              }}
-              onClick={(e) => {
-                e.stopPropagation();
-                setSelectedImageId(id);
-                setCursorNode(null);
-                setCursorOffset(0);
-              }}
-              onDoubleClick={() => setFullscreenImage(baseUrl)}
-            />
-          </ResizableBox>
-        ) : (
-          <img
-            src={baseUrl}
-            alt={props.alt || ""}
-            style={{
-              width: `${width}px`,
-              maxWidth: "100%",
-              height: `${height}px`,
-              objectFit: "contain",
-              cursor: "pointer",
-              border: isSelected ? "2px dashed #3b82f6" : "none",
-            }}
-            onClick={(e) => {
-              e.stopPropagation();
-              setSelectedImageId(id);
-              setCursorNode(null);
-              setCursorOffset(0);
-            }}
-            onDoubleClick={() => setFullscreenImage(baseUrl)}
-          />
-        )}
-        {props.alt && <div className="image-caption">{props.alt}</div>}
-        {isSelected && isPreview && (
-          <div className="image-controls">
-            <div className="alignment-buttons">
-              <button
-                onClick={() => debouncedUpdateImageInContent(id, { align: "left" })}
-                className={align === "left" ? "active" : ""}
-              >
-                Left
-              </button>
-              <button
-                onClick={() => debouncedUpdateImageInContent(id, { align: "center" })}
-                className={align === "center" ? "active" : ""}
-              >
-                Center
-              </button>
-              <button
-                onClick={() => debouncedUpdateImageInContent(id, { align: "right" })}
-                className={align === "right" ? "active" : ""}
-              >
-                Right
-              </button>
-              <button
-                onClick={() => debouncedUpdateImageInContent(id, { align: "none" })}
-                className={align === "none" ? "active" : ""}
-              >
-                Inline
-              </button>
-            </div>
-            <div className="dimension-controls">
-              <label>
-                Width:
-                <input
-                  type="number"
-                  value={selectedImageDimensions?.width || width}
-                  onChange={(e) => {
-                    e.preventDefault();
-                    const newWidth = parseInt(e.target.value, 10);
-                    if (!isNaN(newWidth)) {
-                      setSelectedImageDimensions((prev) => ({ ...prev!, width: newWidth }));
-                      debouncedUpdateImageInContent(id, { width: newWidth });
-                    }
-                  }}
-                />
-                px
-              </label>
-              <label>
-                Height:
-                <input
-                  type="number"
-                  value={selectedImageDimensions?.height || height}
-                  onChange={(e) => {
-                    e.preventDefault();
-                    const newHeight = parseInt(e.target.value, 10);
-                    if (!isNaN(newHeight)) {
-                      setSelectedImageDimensions((prev) => ({ ...prev!, height: newHeight }));
-                      debouncedUpdateImageInContent(id, { height: newHeight });
-                    }
-                  }}
-                />
-                px
-              </label>
-            </div>
-          </div>
-        )}
+        <img
+          src={baseUrl}
+          alt={alt}
+          style={{
+            width: props.style?.width || "100%",
+            height: props.style?.height || "auto",
+            objectFit: "contain",
+            cursor: "pointer",
+            margin: props.style?.margin || "10px 0",
+          }}
+          onDoubleClick={() => setFullscreenImage(baseUrl)}
+        />
+        <div className="image-caption" style={{ textAlign: "center", marginTop: "5px" }}>
+          {alt}
+        </div>
       </div>
     );
   }, (prevProps, nextProps) => {
     return (
       prevProps.src === nextProps.src &&
       prevProps.alt === nextProps.alt &&
-      prevProps.id === nextProps.id &&
-      prevProps.width === nextProps.width &&
-      prevProps.height === nextProps.height &&
-      prevProps.align === nextProps.align
+      JSON.stringify(prevProps.style) === JSON.stringify(nextProps.style)
     );
   });
 
@@ -880,24 +836,15 @@ export default function Editor({
       </div>
     ),
     img: ImageComponent,
+    div: ({ node, children, ...props }: any) => (
+      <div {...props} style={props.style}>
+        {children}
+      </div>
+    ),
     p: ({ node, children, ...props }: any) => {
-      if (typeof children === "string" && children.startsWith("[side-by-side:")) {
-        const images = children.match(/!\[.*?\]\(.*?\)/g) || [];
-        return (
-          <div className="side-by-side-container">
-            {images.map((imgMd: string, index: number) => (
-              <div key={index} className="side-by-side-image">
-                <ReactMarkdown
-                  remarkPlugins={[remarkGfm]}
-                  rehypePlugins={[rehypeHighlight, rehypeRaw]}
-                  components={markdownComponents}
-                >
-                  {imgMd}
-                </ReactMarkdown>
-              </div>
-            ))}
-          </div>
-        );
+      const textContent = toString(node);
+      if (textContent.startsWith("[side-by-side:")) {
+        return null;
       }
       return (
         <p {...props}>
@@ -945,15 +892,13 @@ export default function Editor({
   };
 
   useEffect(() => {
-    console.log("Headings useEffect running", { content, isPreview });
     if (onHeadingsChange) {
       const headings = extractHeadingsFromMarkdown(content);
       onHeadingsChange(headings);
     }
-  }, [content, isPreview, onHeadingsChange]);
+  }, [content, onHeadingsChange]);
 
   useEffect(() => {
-    console.log("Scroll to position useEffect running", { scrollToPosition, isPreview });
     if (scrollToPosition !== undefined && textareaRef.current && !isPreview) {
       textareaRef.current.scrollTop = scrollToPosition;
       textareaRef.current.focus();
@@ -962,7 +907,6 @@ export default function Editor({
   }, [scrollToPosition, isPreview]);
 
   useEffect(() => {
-    console.log("Heading scroll useEffect running", { headingToScroll, isPreview });
     if (headingToScroll && isPreview) {
       const element = headingElements.current[headingToScroll];
       if (element && previewRef.current) {
@@ -979,7 +923,6 @@ export default function Editor({
   }, [headingToScroll, isPreview, onHeadingScrolled]);
 
   useEffect(() => {
-    console.log("Preview scroll useEffect running", { content });
     if (previewRef.current && scrollRef.current > 0) {
       previewRef.current.scrollTop = scrollRef.current;
       scrollRef.current = 0;
@@ -987,18 +930,36 @@ export default function Editor({
   }, [content]);
 
   useEffect(() => {
-    console.log("Cursor scroll useEffect running", { cursorNode, cursorOffset });
     if (cursorRef.current) {
       cursorRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
     }
   }, [cursorNode, cursorOffset]);
 
+  const availableCategories = categoriesList.filter(cat => !selectedCategories.includes(cat.name));
+  const availableSubcategories = selectedCategories.length > 0
+    ? categoriesList
+        .filter(cat => selectedCategories.includes(cat.name))
+        .flatMap(cat => cat.subcategories || [])
+        .filter(subcat => !selectedSubcategories.includes(subcat.name))
+    : [];
+
   return (
-    <div className="editor-container" ref={editorContainerRef}>
+    <div className="w-full bg-white p-5" ref={editorContainerRef}>
       {fullscreenImage && (
-        <div className="image-modal" onClick={() => setFullscreenImage(null)}>
-          <img src={fullscreenImage} alt="Fullscreen" onClick={(e) => e.stopPropagation()} />
-          <button className="close-button" onClick={() => setFullscreenImage(null)}>
+        <div
+          className="image-modal fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center"
+          onClick={() => setFullscreenImage(null)}
+        >
+          <img
+            src={fullscreenImage}
+            alt="Fullscreen"
+            onClick={(e) => e.stopPropagation()}
+            className="max-w-full max-h-full"
+          />
+          <button
+            className="close-button absolute top-4 right-4 bg-gray-500 text-white px-4 py-2 rounded"
+            onClick={() => setFullscreenImage(null)}
+          >
             Close
           </button>
         </div>
@@ -1009,20 +970,20 @@ export default function Editor({
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         placeholder="Blog title"
-        className="editor-title"
+        className="editor-title w-full p-2 mb-4 border rounded"
       />
 
-      <div className="top-image-section">
-        <label className="section-label">Featured Image</label>
-        <div 
-          className={`top-image-upload ${!topImage ? 'empty' : ''}`}
+      <div className="top-image-section mb-4">
+        <label className="section-label block mb-2 font-semibold">Featured Image</label>
+        <div
+          className={`top-image-upload ${!topImage ? "empty" : ""} border rounded p-4 flex justify-center items-center cursor-pointer relative`}
           onClick={() => topImageInputRef.current?.click()}
         >
           {topImage ? (
             <>
-              <img src={topImage} alt="Featured preview" className="top-image-preview" />
-              <button 
-                className="remove-image-button"
+              <img src={topImage} alt="Featured preview" className="top-image-preview max-w-full h-auto" />
+              <button
+                className="remove-image-button absolute top-2 right-2 bg-red-500 text-white rounded-full p-1"
                 onClick={async (e) => {
                   e.stopPropagation();
                   if (topImageFileName) {
@@ -1036,10 +997,10 @@ export default function Editor({
               </button>
             </>
           ) : (
-            <div className="upload-placeholder">
-              <FiUpload size={24} />
-              <span>Click to upload featured image</span>
-              <span className="recommended-size">Recommended: 1200×630px</span>
+            <div className="upload-placeholder text-center">
+              <FiUpload size={24} className="mx-auto" />
+              <span className="block">Click to upload featured image</span>
+              <span className="block text-sm text-gray-500">Recommended: 1200×630px</span>
             </div>
           )}
           <input
@@ -1052,71 +1013,208 @@ export default function Editor({
         </div>
       </div>
 
-      <div className="category-section">
-        <label className="section-label">Categories</label>
-        <div className="category-selector">
-          <div className="selected-categories">
-            {selectedCategories.map((cat, index) => (
-              <span key={index} className="category-tag">
-                {cat}
-                <button 
-                  onClick={() => setSelectedCategories(selectedCategories.filter(c => c !== cat))}
-                  className="remove-category"
-                >
-                  <FiX size={12} />
-                </button>
-              </span>
-            ))}
-          </div>
-          <div className="category-input-container">
-            <input
-              type="text"
-              value={newCategory}
-              onChange={(e) => setNewCategory(e.target.value)}
-              onFocus={() => setShowCategoryDropdown(true)}
-              placeholder="Add new category"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && newCategory.trim()) {
-                  setSelectedCategories([...selectedCategories, newCategory.trim()]);
-                  setNewCategory('');
-                  setShowCategoryDropdown(false);
-                }
-              }}
-            />
-            {showCategoryDropdown && categoriesList.length > 0 && (
-              <div className="category-dropdown">
-                {categoriesList
-                  .filter(cat => !selectedCategories.includes(cat.name))
-                  .map((cat) => (
-                    <div 
-                      key={cat.id}
-                      className="category-option"
-                      onClick={() => {
-                        setSelectedCategories([...selectedCategories, cat.name]);
-                        setShowCategoryDropdown(false);
-                      }}
+      <div className="category-section mb-4">
+        <label className="section-label block mb-2 font-semibold">Categories</label>
+        <div className="selected-items flex flex-wrap gap-2 mb-4">
+          {selectedCategories.map((cat, index) => (
+            <span
+              key={`cat-${index}`}
+              className="category-tag bg-blue-100 text-blue-800 rounded px-2 py-1 flex items-center"
+            >
+              {cat}
+              <button
+                onClick={() => removeSelectedCategory(cat)}
+                className="remove-category ml-2 hover:bg-red-200 rounded"
+              >
+                <FiX size={12} />
+              </button>
+            </span>
+          ))}
+        </div>
+        <div className="category-input-container relative">
+          <input
+            ref={categoryInputRef}
+            type="text"
+            value={newCategory}
+            onChange={handleCategoryInputChange}
+            onFocus={toggleCategoryDropdown}
+            placeholder="Select or type category name"
+            className="w-full p-2 border rounded"
+            onKeyDown={handleCategoryKeyDown}
+          />
+          {showCategoryDropdown && (
+            <div className="category-dropdown absolute z-10 bg-white border rounded shadow-lg mt-1 w-full max-h-60 overflow-y-auto">
+              <div className="p-2 border-b">
+                <input
+                  type="text"
+                  value={newCategory}
+                  onChange={handleCategoryInputChange}
+                  placeholder="Type to create new category"
+                  className="w-full p-2 border rounded"
+                  onKeyDown={handleCategoryKeyDown}
+                />
+              </div>
+              {availableCategories.length > 0 && (
+                <div className="category-list">
+                  {availableCategories.map((category) => (
+                    <div
+                      key={category.id}
+                      className="category-option p-3 hover:bg-gray-100 cursor-pointer border-b last:border-b-0"
+                      onClick={() => selectCategory(category.name)}
                     >
-                      {cat.name}
+                      <div className="flex justify-between items-center">
+                        <span className="font-medium">{category.name}</span>
+                        <span className="text-sm text-gray-500">
+                          {category.subcategories?.length || 0} subcategories
+                        </span>
+                      </div>
+                      {category.subcategories && category.subcategories.length > 0 && (
+                        <div className="mt-2 text-sm text-gray-600">
+                          Examples: {category.subcategories.slice(0, 2).map(sub => sub.name).join(", ")}
+                          {category.subcategories.length > 2 && "..."}
+                        </div>
+                      )}
                     </div>
                   ))}
+                </div>
+              )}
+              {availableCategories.length === 0 && newCategory.trim() && (
+                <div className="p-3 text-center text-gray-500">
+                  Press Enter to create "{newCategory}" as new category
+                </div>
+              )}
+              <div className="p-2 border-t flex justify-between">
                 <button
-                  className="close-dropdown"
-                  onClick={() => setShowCategoryDropdown(false)}
-                  style={{
-                    position: "absolute",
-                    top: "5px",
-                    right: "5px",
-                    background: "transparent",
-                    border: "none",
-                    cursor: "pointer",
+                  onClick={() => {
+                    if (newCategory.trim()) {
+                      selectCategory(newCategory.trim());
+                    }
                   }}
+                  className="bg-blue-500 text-white px-3 py-1 rounded text-sm"
+                  disabled={!newCategory.trim()}
                 >
-                  <FiX size={16} />
+                  Add Category
                 </button>
+                <button
+                  onClick={toggleCategoryDropdown}
+                  className="text-gray-500 hover:text-gray-700 text-sm"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="subcategory-section mb-4">
+        <label className="section-label block mb-2 font-semibold">Subcategories</label>
+        <div className="selected-items flex flex-wrap gap-2 mb-4">
+          {selectedSubcategories.map((subcat, index) => (
+            <span
+              key={`subcat-${index}`}
+              className="subcategory-tag bg-green-100 text-green-800 rounded px-2 py-1 flex items-center"
+            >
+              {subcat}
+              <button
+                onClick={() => removeSelectedSubcategory(subcat)}
+                className="remove-subcategory ml-2 hover:bg-red-200 rounded"
+              >
+                <FiX size={12} />
+              </button>
+            </span>
+          ))}
+        </div>
+        {selectedCategories.length === 0 && (
+          <div className="text-center py-4 text-gray-500 bg-gray-50 rounded p-3">
+            <p>Select at least one category first to see available subcategories</p>
+          </div>
+        )}
+        {selectedCategories.length > 0 && (
+          <div className="subcategory-input-container relative">
+            <input
+              ref={subcategoryInputRef}
+              type="text"
+              value={newSubcategory}
+              onChange={handleSubcategoryInputChange}
+              onFocus={toggleSubcategoryDropdown}
+              placeholder={
+                selectedCategories.length > 0
+                  ? `Select subcategory from ${selectedCategories.join(", ")} or type new`
+                  : "Select category first"
+              }
+              className="w-full p-2 border rounded"
+              onKeyDown={handleSubcategoryKeyDown}
+              disabled={selectedCategories.length === 0}
+            />
+            {showSubcategoryDropdown && selectedCategories.length > 0 && (
+              <div className="subcategory-dropdown absolute z-10 bg-white border rounded shadow-lg mt-1 w-full max-h-60 overflow-y-auto">
+                <div className="p-2 border-b">
+                  <input
+                    type="text"
+                    value={newSubcategory}
+                    onChange={handleSubcategoryInputChange}
+                    placeholder="Type to create new subcategory"
+                    className="w-full p-2 border rounded"
+                    onKeyDown={handleSubcategoryKeyDown}
+                  />
+                </div>
+                {availableSubcategories.length > 0 && (
+                  <div className="subcategory-list">
+                    {availableSubcategories.map((subcategory) => {
+                      const parentCategory = categoriesList.find(cat =>
+                        cat.subcategories?.some(sub => sub.id === subcategory.id)
+                      );
+                      return (
+                        <div
+                          key={subcategory.id}
+                          className="subcategory-option p-3 hover:bg-gray-100 cursor-pointer border-b last:border-b-0"
+                          onClick={() => selectSubcategory(subcategory.name)}
+                        >
+                          <div className="flex justify-between items-center">
+                            <span className="font-medium">{subcategory.name}</span>
+                            <span className="text-sm text-gray-500">
+                              {parentCategory?.name}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                {availableSubcategories.length === 0 && newSubcategory.trim() && (
+                  <div className="p-3 text-center text-gray-500">
+                    Press Enter to create "{newSubcategory}" as new subcategory
+                  </div>
+                )}
+                <div className="p-2 border-t flex justify-between">
+                  <button
+                    onClick={() => {
+                      if (newSubcategory.trim()) {
+                        selectSubcategory(newSubcategory.trim());
+                      }
+                    }}
+                    className="bg-green-500 text-white px-3 py-1 rounded text-sm"
+                    disabled={!newSubcategory.trim() || selectedCategories.length === 0}
+                  >
+                    Add Subcategory
+                  </button>
+                  <button
+                    onClick={toggleSubcategoryDropdown}
+                    className="text-gray-500 hover:text-gray-700 text-sm"
+                  >
+                    Close
+                  </button>
+                </div>
               </div>
             )}
           </div>
-        </div>
+        )}
+        {selectedCategories.length > 0 && availableSubcategories.length === 0 && !showSubcategoryDropdown && (
+          <div className="mt-2 p-3 bg-blue-50 rounded text-sm text-blue-700">
+            <p>No subcategories found for selected categories. You can create new ones above.</p>
+          </div>
+        )}
       </div>
 
       <Toolbar
@@ -1128,9 +1226,9 @@ export default function Editor({
         onImageLayoutChange={(layout) => setImageLayout(layout)}
       />
 
-      <div className="editor-toolbar">
-        <div className="color-picker">
-          <label>
+      <div className="editor-toolbar flex gap-4 mb-4">
+        <div className="color-picker flex items-center gap-2">
+          <label className="flex items-center gap-1">
             Text Color
             <input
               type="color"
@@ -1140,11 +1238,11 @@ export default function Editor({
           </label>
           <button
             onClick={() => debouncedApplyColorStyle(activeColor, false)}
-            className="apply-color-button"
+            className="apply-color-button bg-blue-500 text-white px-2 py-1 rounded"
           >
             Apply Text Color
           </button>
-          <label>
+          <label className="flex items-center gap-1">
             Background
             <input
               type="color"
@@ -1154,58 +1252,62 @@ export default function Editor({
           </label>
           <button
             onClick={() => debouncedApplyColorStyle(activeBgColor, true)}
-            className="apply-color-button"
+            className="apply-color-button bg-blue-500 text-white px-2 py-1 rounded"
           >
             Apply Background Color
           </button>
         </div>
 
-        <div className="ogp-input">
+        <div className="ogp-input flex items-center gap-2">
           <input
             type="text"
             value={urlForOGP}
             onChange={(e) => setUrlForOGP(e.target.value)}
             onPaste={handleOGPPaste}
             placeholder="Enter URL for OGP card"
+            className="p-2 border rounded"
             onKeyDown={(e) => e.key === "Enter" && handleOGPCardInsert(urlForOGP)}
           />
-          <button onClick={() => handleOGPCardInsert(urlForOGP)}>Add OGP Card</button>
+          <button
+            onClick={() => handleOGPCardInsert(urlForOGP)}
+            className="bg-blue-500 text-white px-2 py-1 rounded"
+          >
+            Add OGP Card
+          </button>
         </div>
       </div>
 
-      {isPreview && (
-        <div className="editor-toolbar" style={{ marginBottom: "10px" }}>
-          <button
-            className="toolbar-button"
-            onClick={() => triggerImageUpload("single")}
-          >
-            Add Single Image
-          </button>
-          <button
-            className="toolbar-button"
-            onClick={() => triggerImageUpload("side-by-side")}
-          >
-            Add Side-by-Side Images
-          </button>
-          <input
-            type="file"
-            ref={fileInputRef}
-            style={{ display: "none" }}
-            accept="image/*"
-            multiple
-            onChange={(e) => {
-              if (e.target.files) {
-                handleImageUpload(e.target.files, imageLayout);
-              }
-            }}
-          />
-        </div>
-      )}
+      <div className="editor-toolbar mb-4">
+        <button
+          className="toolbar-button bg-blue-500 text-white px-2 py-1 rounded mr-2"
+          onClick={() => triggerImageUpload("single")}
+        >
+          Add Single Image
+        </button>
+        <button
+          className="toolbar-button bg-blue-500 text-white px-2 py-1 rounded"
+          onClick={() => triggerImageUpload("side-by-side")}
+        >
+          Add Side-by-Side Images
+        </button>
+        <input
+          type="file"
+          ref={fileInputRef}
+          style={{ display: "none" }}
+          accept="image/*"
+          multiple
+          onChange={(e) => {
+            if (e.target.files) {
+              handleImageUpload(e.target.files, imageLayout);
+            }
+          }}
+        />
+      </div>
 
       {isPreview ? (
         <div
           ref={previewRef}
-          className="markdown-preview"
+          className="markdown-preview border rounded p-4"
           onClick={handlePreviewClick}
         >
           <ReactMarkdown
@@ -1221,33 +1323,48 @@ export default function Editor({
           ref={textareaRef}
           value={content}
           onChange={(e) => setContent(e.target.value)}
-          className="editor-content"
+          className="editor-content w-full h-96 p-2 border rounded mb-4"
           placeholder="Write your blog content here (Markdown supported)..."
         />
       )}
 
-      <div className="editor-actions">
-        <button className="save-button" onClick={handleSaveDraft}>
+      <div className="editor-actions flex gap-4 mt-4">
+        <button
+          className="save-button bg-gray-500 text-white px-4 py-2 rounded"
+          onClick={handleSaveDraft}
+        >
           Save Draft
         </button>
-        <button className="publish-button" onClick={handlePublish}>
+        <button
+          className="publish-button bg-green-500 text-white px-4 py-2 rounded"
+          onClick={handlePublish}
+        >
           Publish
         </button>
       </div>
 
       {showDateDialog && (
-        <div className="date-dialog">
-          <div className="date-dialog-content">
-            <h3>Select Publish Date</h3>
-            <input
-              type="datetime-local"
-              value={publishDate}
-              onChange={(e) => setPublishDate(e.target.value)}
-            />
-            <div className="date-dialog-buttons">
-              <button onClick={confirmPublish}>Confirm</button>
-              <button onClick={() => setShowDateDialog(false)}>Cancel</button>
-            </div>
+        <div className="date-dialog mt-4 border rounded p-4 bg-gray-50">
+          <h3 className="mb-4 font-semibold">Select Publish Date</h3>
+          <input
+            type="date"
+            value={publishDate}
+            onChange={(e) => setPublishDate(e.target.value)}
+            className="w-full p-2 border rounded mb-4"
+          />
+          <div className="date-dialog-buttons flex gap-2">
+            <button
+              onClick={confirmPublish}
+              className="bg-blue-500 text-white px-4 py-2 rounded"
+            >
+              Confirm
+            </button>
+            <button
+              onClick={() => setShowDateDialog(false)}
+              className="bg-gray-500 text-white px-4 py-2 rounded"
+            >
+              Cancel
+            </button>
           </div>
         </div>
       )}
