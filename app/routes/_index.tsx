@@ -1,9 +1,11 @@
+// MainApp.jsx
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import TableOfContents from "~/components/TableOfContents";
 import Bloglist from "~/components/BlogList";
 import Editor from "~/components/Editor";
 import ShopManagerPage from "~/components/ShopManagerPage";
+import SeeAndDoManagerPage from "~/components/SeeAndDoManagerPage"; // Import the new component
 import supabase from '~/supabase';
 
 type Heading = {
@@ -12,9 +14,8 @@ type Heading = {
   level: number;
 };
 
-type AppView = "blog-editor" | "shop-manager";
+type AppView = "blog-editor" | "shop-manager" | "see-and-do"; // Add new view
 
-// লগিন কম্পোনেন্ট
 function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -112,7 +113,6 @@ function LoginPage() {
   );
 }
 
-// প্রধান অ্যাপ কম্পোনেন্ট
 function MainApp() {
   const [headings, setHeadings] = useState<Heading[]>([]);
   const [scrollPosition, setScrollPosition] = useState<number>(0);
@@ -190,12 +190,23 @@ function MainApp() {
             <span>🛍️</span>
             <span>Shop Manager</span>
           </button>
-          <div className="border-t border-gray-700 my-2"></div>
-          <button className="p-3 rounded flex items-center gap-2 hover:bg-gray-700">
-            <span>📊</span>
-            <span>Analytics</span>
+          <button
+            className={`p-3 rounded flex items-center gap-2 ${
+              currentView === "see-and-do" 
+                ? "bg-blue-600 text-white" 
+                : "hover:bg-gray-700"
+            }`}
+            onClick={() => {
+              console.log("See and Do button clicked");
+              handleViewChange("see-and-do");
+            }}
+          >
+            <span>🏞️</span>
+            <span>See and Do</span>
           </button>
-          <button className="p-3 rounded flex items-center gap-2 hover:bg-gray-700">
+          <button
+            className="p-3 rounded flex items-center gap-2 hover:bg-gray-700"
+          >
             <span>⚙️</span>
             <span>Settings</span>
           </button>
@@ -236,12 +247,25 @@ function MainApp() {
           >
             Shop Manager
           </button>
+          <button
+            className={`p-2 rounded ${
+              currentView === "see-and-do" 
+                ? "bg-blue-500 text-white" 
+                : "bg-gray-200"
+            }`}
+            onClick={() => {
+              console.log("Mobile See and Do button clicked");
+              handleViewChange("see-and-do");
+            }}
+          >
+            See and Do
+          </button>
         </div>
         <div className="flex-1 overflow-auto bg-white">
           {currentView === "blog-editor" ? (
             <div className="flex h-full">
               <div className="w-full md:w-1/4 border-r overflow-auto bg-white">
-               <Bloglist 
+                <Bloglist 
                   onBlogSelect={handleBlogSelect} 
                   onNewBlog={handleNewBlog} 
                 />
@@ -249,19 +273,23 @@ function MainApp() {
               <div className="hidden md:block md:w-3/4 overflow-auto bg-red-200">
                 <div className="w-full h-full">
                   <Editor
-                  onHeadingsChange={handleHeadingsChange}
-                  scrollToPosition={scrollPosition}
-                  onPreviewToggle={() => setIsPreview(!isPreview)}
-                  headingToScroll={headingToScroll}
-                  onHeadingScrolled={() => setHeadingToScroll(null)}
-                  blogId={selectedBlogId}
-                />
+                    onHeadingsChange={handleHeadingsChange}
+                    scrollToPosition={scrollPosition}
+                    onPreviewToggle={() => setIsPreview(!isPreview)}
+                    headingToScroll={headingToScroll}
+                    onHeadingScrolled={() => setHeadingToScroll(null)}
+                    blogId={selectedBlogId}
+                  />
                 </div>
               </div>
             </div>
-          ) : (
+          ) : currentView === "shop-manager" ? (
             <div className="h-full overflow-auto bg-white">
               <ShopManagerPage />
+            </div>
+          ) : (
+            <div className="h-full overflow-auto bg-white">
+              <SeeAndDoManagerPage />
             </div>
           )}
         </div>
@@ -270,14 +298,12 @@ function MainApp() {
   );
 }
 
-// মূল এক্সপোর্ট করা কম্পোনেন্ট
 export default function App() {
   const navigate = useNavigate();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check for existing session
     const checkAuth = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       
@@ -289,7 +315,6 @@ export default function App() {
 
     checkAuth();
 
-    // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (session) {
@@ -303,17 +328,6 @@ export default function App() {
 
     return () => subscription.unsubscribe();
   }, [navigate]);
-
-  // if (loading) {
-  //   return (
-  //     <div className="min-h-screen flex items-center justify-center bg-gray-50">
-  //       <div className="text-center">
-  //         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
-  //         <p className="mt-4 text-gray-600">Checking authentication...</p>
-  //       </div>
-  //     </div>
-  //   );
-  // }
 
   return isAuthenticated ? <MainApp /> : <LoginPage />;
 }
