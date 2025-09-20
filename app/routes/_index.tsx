@@ -14,7 +14,7 @@ type Heading = {
   level: number;
 };
 
-type AppView = "blog-editor" | "shop-manager" | "see-and-do"; // Add new view
+type AppView = "blog-editor" | "shop-manager" | "see-and-do";
 
 function LoginPage() {
   const [email, setEmail] = useState('');
