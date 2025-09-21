@@ -1,4 +1,3 @@
-// SeeAndDoManagerPage.jsx
 import { useState, useEffect } from "react";
 import { createClient } from '@supabase/supabase-js';
 
@@ -14,21 +13,42 @@ const supabaseTourist = createClient(supabaseTouristUrl || '', supabaseTouristKe
 
 export default function SeeAndDoManagerPage() {
   const [places, setPlaces] = useState([]);
+  const [categories, setCategories] = useState([]); // New state for categories
   const [selectedPlace, setSelectedPlace] = useState(null);
   const [view, setView] = useState("places");
   const [loading, setLoading] = useState(false);
 
-  // Fetch all tourist places
+  // Fetch all tourist places and categories
   useEffect(() => {
     fetchPlaces();
+    fetchCategories();
   }, []);
 
+  // Fetch all categories
+  const fetchCategories = async () => {
+    try {
+      const { data, error } = await supabaseTourist
+        .from('categories')
+        .select('id, name')
+        .order('name');
+      
+      if (error) throw error;
+      setCategories(data);
+    } catch (error) {
+      console.error('Error fetching categories:', error.message);
+    }
+  };
+
+  // Fetch all tourist places
   const fetchPlaces = async () => {
     setLoading(true);
     try {
       const { data, error } = await supabaseTourist
         .from('tourist_places')
-        .select('*')
+        .select(`
+          *,
+          categories (name)
+        `)
         .order('name');
       
       if (error) throw error;
@@ -198,6 +218,7 @@ export default function SeeAndDoManagerPage() {
             {view === "editPlace" && (
               <PlaceEditor 
                 place={selectedPlace}
+                categories={categories} // Pass categories to PlaceEditor
                 onSave={handleSavePlace}
                 onCancel={() => setView("places")}
               />
@@ -258,7 +279,7 @@ function PlaceList({ places, onPlaceSelect, onPlaceDelete }) {
               </div>
               <div className="p-5">
                 <h3 className="font-semibold text-xl mb-2 text-white">{place.name}</h3>
-                <p className="text-indigo-300 text-sm mb-3 capitalize">{place.category}</p>
+                <p className="text-indigo-300 text-sm mb-3 capitalize">{place.categories?.name || 'N/A'}</p>
                 <p className="text-gray-400 text-sm mb-4 line-clamp-2">{place.description}</p>
                 
                 {place.near_station && (
@@ -306,7 +327,7 @@ function PlaceList({ places, onPlaceSelect, onPlaceDelete }) {
 }
 
 // PlaceEditor Component
-function PlaceEditor({ place, onSave, onCancel }) {
+function PlaceEditor({ place, categories, onSave, onCancel }) {
   const [formData, setFormData] = useState({
     ...place,
     other_images: place.other_images || [],
@@ -475,11 +496,9 @@ function PlaceEditor({ place, onSave, onCancel }) {
                     required
                   >
                     <option value="">Select a category</option>
-                    <option value="historical">Historical</option>
-                    <option value="natural">Natural</option>
-                    <option value="cultural">Cultural</option>
-                    <option value="adventure">Adventure</option>
-                    <option value="other">Other</option>
+                    {categories.map(category => (
+                      <option key={category.id} value={category.id}>{category.name}</option>
+                    ))}
                   </select>
                 </div>
                 

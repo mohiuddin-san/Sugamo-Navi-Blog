@@ -15,6 +15,7 @@ export default function ShopApp() {
   const [shops, setShops] = useState([]);
   const [offers, setOffers] = useState([]);
   const [recommendations, setRecommendations] = useState([]);
+  const [categories, setCategories] = useState([]); // New state for categories
   const [selectedShop, setSelectedShop] = useState(null);
   const [view, setView] = useState("shops");
   const [loading, setLoading] = useState(false);
@@ -24,7 +25,23 @@ export default function ShopApp() {
     fetchShops();
     fetchOffers();
     fetchRecommendations();
+    fetchCategories(); // Fetch categories
   }, []);
+
+  // Fetch all categories
+  const fetchCategories = async () => {
+    try {
+      const { data, error } = await supabaseShop
+        .from('categories')
+        .select('id, name')
+        .order('name');
+      
+      if (error) throw error;
+      setCategories(data);
+    } catch (error) {
+      console.error('Error fetching categories:', error.message);
+    }
+  };
 
   // Fetch all shops
   const fetchShops = async () => {
@@ -32,7 +49,10 @@ export default function ShopApp() {
     try {
       const { data, error } = await supabaseShop
         .from('shops')
-        .select('*')
+        .select(`
+          *,
+          categories (name)
+        `)
         .order('name');
       
       if (error) throw error;
@@ -177,7 +197,7 @@ export default function ShopApp() {
   };
 
   return (
-    <div className=" bg-gray-900 text-gray-100 p-6">
+    <div className="bg-gray-900 text-gray-100 p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
@@ -258,6 +278,7 @@ export default function ShopApp() {
             {view === "editShop" && (
               <ShopEditor 
                 shop={selectedShop}
+                categories={categories} // Pass categories to ShopEditor
                 onSave={handleSaveShop}
                 onCancel={() => setView("shops")}
               />
@@ -344,7 +365,7 @@ function ShopList({ shops, onShopSelect, onShopDelete }) {
               </div>
               <div className="p-5">
                 <h3 className="font-semibold text-xl mb-2 text-white">{shop.name}</h3>
-                <p className="text-indigo-300 text-sm mb-3 capitalize">{shop.category}</p>
+                <p className="text-indigo-300 text-sm mb-3 capitalize">{shop.categories?.name || 'N/A'}</p>
                 <p className="text-gray-400 text-sm mb-4 line-clamp-2">{shop.description}</p>
                 
                 {/* Display near station if available */}
@@ -363,7 +384,7 @@ function ShopList({ shops, onShopSelect, onShopDelete }) {
                     className="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors duration-200 flex items-center justify-center gap-2"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                      <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.380-8.379-2.83-2.828z" />
+                      <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
                     </svg>
                     Edit
                   </button>
@@ -372,7 +393,7 @@ function ShopList({ shops, onShopSelect, onShopDelete }) {
                     className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors duration-200 flex items-center justify-center"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 极 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                      <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
                     </svg>
                   </button>
                 </div>
@@ -386,7 +407,7 @@ function ShopList({ shops, onShopSelect, onShopDelete }) {
 }
 
 // ShopEditor Component with Image Upload
-function ShopEditor({ shop, onSave, onCancel }) {
+function ShopEditor({ shop, categories, onSave, onCancel }) {
   const [formData, setFormData] = useState({
     ...shop,
     other_images: shop.other_images || [],
@@ -530,7 +551,7 @@ function ShopEditor({ shop, onSave, onCancel }) {
             <div className="bg-gray-700 p-5 rounded-xl">
               <h3 className="text-lg font-medium text-white mb-4 flex items-center gap-2">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-indigo-400" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M10 9a3 3 极 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                  <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
                 </svg>
                 Basic Information
               </h3>
@@ -554,16 +575,13 @@ function ShopEditor({ shop, onSave, onCancel }) {
                     name="category"
                     value={formData.category}
                     onChange={handleChange}
-                    className="极 px-4 py-3 bg-gray-600 border border-gray-500 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full px-4 py-3 bg-gray-600 border border-gray-500 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     required
                   >
                     <option value="">Select a category</option>
-                    <option value="restaurant">Restaurant</option>
-                    <option value="clothing">Clothing</option>
-                    <option value="electronics">Electronics</option>
-                    <option value="grocery">Grocery</option>
-                    <option value="medical">Medical</option>
-                    <option value="other">Other</option>
+                    {categories.map(category => (
+                      <option key={category.id} value={category.id}>{category.name}</option>
+                    ))}
                   </select>
                 </div>
                 
@@ -574,7 +592,7 @@ function ShopEditor({ shop, onSave, onCancel }) {
                     value={formData.description}
                     onChange={handleChange}
                     rows="4"
-                    className="w-full px-4 py-3 bg-gray-500 border border-gray-500 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full px-4 py-3 bg-gray-600 border border-gray-500 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
                 </div>
               </div>
@@ -614,7 +632,7 @@ function ShopEditor({ shop, onSave, onCancel }) {
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text极-300 mb-2">Opening Hours</label>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Opening Hours</label>
                   <input
                     type="text"
                     name="opening_hours"
@@ -649,8 +667,8 @@ function ShopEditor({ shop, onSave, onCancel }) {
           <div className="space-y-6">
             <div className="bg-gray-700 p-5 rounded-xl">
               <h3 className="text-lg font-medium text-white mb-4 flex items-center gap-2">
-                <svg xmlns="http极//www.w3.org/2000/svg" className="h-5 w-5 text-indigo-400" viewBox="0 0 20 20" fill="currentColor">
-                  <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54极4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" />
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-indigo-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" />
                 </svg>
                 Contact Information
               </h3>
@@ -674,7 +692,7 @@ function ShopEditor({ shop, onSave, onCancel }) {
                     name="contact_email"
                     value={formData.contact_email}
                     onChange={handleChange}
-                    className="w-full px-4 py-3 bg-gray-600 border border-gray-500 text-white rounded-lg focus:outline-none focus:ring-2 focus极ring-indigo-500"
+                    className="w-full px-4 py-3 bg-gray-600 border border-gray-500 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
                 </div>
                 
@@ -713,8 +731,8 @@ function ShopEditor({ shop, onSave, onCancel }) {
             {/* Image Upload Section */}
             <div className="bg-gray-700 p-5 rounded-xl">
               <h3 className="text-lg font-medium text-white mb-4 flex items-center gap-2">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-indigo-400" viewBox="0 极 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 极 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-indigo-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
                 </svg>
                 Shop Images
               </h3>
@@ -784,7 +802,7 @@ function ShopEditor({ shop, onSave, onCancel }) {
                       </div>
                     ))}
                     
-                    <label className="cursor-pointer bg-gray-600 border-2 border-dashed border-gray-500 rounded-lg极28 w-28 flex items-center justify-center hover:border-indigo-400 transition-colors">
+                    <label className="cursor-pointer bg-gray-600 border-2 border-dashed border-gray-500 rounded-lg h-28 w-28 flex items-center justify-center hover:border-indigo-400 transition-colors">
                       {uploadingOther ? (
                         <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-indigo-400"></div>
                       ) : (
@@ -887,7 +905,7 @@ function OfferManager({ offers, shops, onSave, onDelete }) {
       } else {
         // Create new offer
         const { error } = await supabaseShop
-          .from('极rs')
+          .from('offers')
           .insert([formData]);
         
         if (error) throw error;
@@ -1217,7 +1235,7 @@ function RecommendationManager({ recommendations, shops, onSave, onDelete }) {
         .delete()
         .eq('id', recommendationId);
       
-      if (error) error;
+      if (error) throw error;
       onDelete();
     } catch (error) {
       console.error('Error deleting recommendation:', error.message);
@@ -1231,10 +1249,10 @@ function RecommendationManager({ recommendations, shops, onSave, onDelete }) {
         <h2 className="text-2xl font-semibold text-gray-100">Manage Recommendations</h2>
         <button
           onClick={handleNewRecommendation}
-          className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-极 text-white rounded-lg transition-all duration-200 flex items-center gap-2"
+          className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-all duration-200 flex items-center gap-2"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-            <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0极-3H6a1 1 0 110-2h3V6a1 1 0 011-1极" clipRule="evenodd" />
+            <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
           </svg>
           New Recommendation
         </button>
@@ -1308,9 +1326,7 @@ function RecommendationManager({ recommendations, shops, onSave, onDelete }) {
               )}
             </div>
             <div className="p-5">
-              <h3 className="font-semibold text-lg mb-2 text-white">{recommendation.title}</h3>
-              <p className="text-indigo-300 text-sm mb-2">{recommendation.shops?.name}</p>
-              <p className="text-gray-400 text-sm mb-3">{recommendation.description}</p>
+              <h3 className="font-semibold text-lg mb-2 text-white">{recommendation.shops?.name}</h3>
               <p className="text-gray-400 text-sm mb-4">Priority: {recommendation.priority}</p>
               <div className="flex space-x-3">
                 <button
@@ -1326,8 +1342,8 @@ function RecommendationManager({ recommendations, shops, onSave, onDelete }) {
                   onClick={() => handleDeleteRecommendation(recommendation.id)}
                   className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors duration-200 flex items-center justify-center"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="极 w-4" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2极8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
                   </svg>
                 </button>
               </div>

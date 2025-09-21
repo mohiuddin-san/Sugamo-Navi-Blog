@@ -1,11 +1,11 @@
-// MainApp.jsx
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import TableOfContents from "~/components/TableOfContents";
 import Bloglist from "~/components/BlogList";
 import Editor from "~/components/Editor";
 import ShopManagerPage from "~/components/ShopManagerPage";
-import SeeAndDoManagerPage from "~/components/SeeAndDoManagerPage"; // Import the new component
+import SeeAndDoManagerPage from "~/components/SeeAndDoManagerPage";
+import CategoryManagerPage from "~/components/CategoryManagerPage"; // New component
 import supabase from '~/supabase';
 
 type Heading = {
@@ -14,7 +14,7 @@ type Heading = {
   level: number;
 };
 
-type AppView = "blog-editor" | "shop-manager" | "see-and-do";
+type AppView = "blog-editor" | "shop-manager" | "see-and-do" | "categories";
 
 function LoginPage() {
   const [email, setEmail] = useState('');
@@ -205,10 +205,18 @@ function MainApp() {
             <span>See and Do</span>
           </button>
           <button
-            className="p-3 rounded flex items-center gap-2 hover:bg-gray-700"
+            className={`p-3 rounded flex items-center gap-2 ${
+              currentView === "categories" 
+                ? "bg-blue-600 text-white" 
+                : "hover:bg-gray-700"
+            }`}
+            onClick={() => {
+              console.log("Categories button clicked");
+              handleViewChange("categories");
+            }}
           >
-            <span>⚙️</span>
-            <span>Settings</span>
+            <span>🏷️</span>
+            <span>Categories</span>
           </button>
           <button 
             className="p-3 rounded flex items-center gap-2 hover:bg-gray-700 mt-auto"
@@ -260,6 +268,19 @@ function MainApp() {
           >
             See and Do
           </button>
+          <button
+            className={`p-2 rounded ${
+              currentView === "categories" 
+                ? "bg-blue-500 text-white" 
+                : "bg-gray-200"
+            }`}
+            onClick={() => {
+              console.log("Mobile Categories button clicked");
+              handleViewChange("categories");
+            }}
+          >
+            Categories
+          </button>
         </div>
         <div className="flex-1 overflow-auto bg-white">
           {currentView === "blog-editor" ? (
@@ -287,9 +308,13 @@ function MainApp() {
             <div className="h-full overflow-auto bg-white">
               <ShopManagerPage />
             </div>
-          ) : (
+          ) : currentView === "see-and-do" ? (
             <div className="h-full overflow-auto bg-white">
               <SeeAndDoManagerPage />
+            </div>
+          ) : (
+            <div className="h-full overflow-auto bg-white">
+              <CategoryManagerPage />
             </div>
           )}
         </div>
