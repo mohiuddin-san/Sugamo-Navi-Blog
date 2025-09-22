@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { createClient } from '@supabase/supabase-js';
 import { v4 as uuidv4 } from 'uuid';
+import blogSupabase from "~/supabase";
 
 // Initialize Supabase client
 const supabaseUrl = import.meta.env.VITE_TOURIST_SUPABASE_URL || import.meta.env.VITE_SHOP_SUPABASE_URL;
@@ -19,9 +20,16 @@ export default function CategoryManagerPage() {
   const [editingCategory, setEditingCategory] = useState(null);
   const [loading, setLoading] = useState(false);
 
+  const [blogCategories, setBlogCategories] = useState([]);
+  const [newBlogCategoryName, setNewBlogCategoryName] = useState("");
+  const [editingBlogCategory, setEditingBlogCategory] = useState(null);
+  const [localSubcategories, setLocalSubcategories] = useState([]);
+  const [newSubcategoryName, setNewSubcategoryName] = useState("");
+
   // Fetch all categories
   useEffect(() => {
     fetchCategories();
+    fetchBlogCategories();
   }, []);
 
   const fetchCategories = async () => {
@@ -37,6 +45,24 @@ export default function CategoryManagerPage() {
     } catch (error) {
       console.error('Error fetching categories:', error.message);
       alert('Error fetching categories: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchBlogCategories = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await blogSupabase
+        .from('categories')
+        .select('*')
+        .order('name');
+      
+      if (error) throw error;
+      setBlogCategories(data || []);
+    } catch (error) {
+      console.error('Error fetching blog categories:', error.message);
+      alert('Error fetching blog categories: ' + error.message);
     } finally {
       setLoading(false);
     }
@@ -163,6 +189,111 @@ export default function CategoryManagerPage() {
     }
   };
 
+  // Blog category handlers
+  const handleAddBlogCategory = async () => {
+    if (!newBlogCategoryName.trim()) {
+      alert("Blog category name cannot be empty");
+      return;
+    }
+    setLoading(true);
+    try {
+      const { data, error } = await blogSupabase
+        .from('categories')
+        .insert([{ 
+          name: newBlogCategoryName.trim(),
+          subcategories: [] 
+        }])
+        .select();
+      
+      if (error) throw error;
+      
+      setBlogCategories([...blogCategories, data[0]]);
+      setNewBlogCategoryName("");
+    } catch (error) {
+      console.error('Error adding blog category:', error.message);
+      alert('Error adding blog category: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEditBlogCategory = (category) => {
+    setEditingBlogCategory(category);
+    setNewBlogCategoryName(category.name);
+    setLocalSubcategories(category.subcategories || []);
+    setNewSubcategoryName("");
+  };
+
+  const handleUpdateBlogCategory = async () => {
+    if (!newBlogCategoryName.trim()) {
+      alert("Blog category name cannot be empty");
+      return;
+    }
+    setLoading(true);
+    try {
+      const { error } = await blogSupabase
+        .from('categories')
+        .update({ 
+          name: newBlogCategoryName.trim(), 
+          subcategories: localSubcategories
+        })
+        .eq('id', editingBlogCategory.id);
+      
+      if (error) throw error;
+      
+      setBlogCategories(blogCategories.map(cat => 
+        cat.id === editingBlogCategory.id ? { 
+          ...cat, 
+          name: newBlogCategoryName.trim(), 
+          subcategories: localSubcategories
+        } : cat
+      ));
+      setEditingBlogCategory(null);
+      setNewBlogCategoryName("");
+      setLocalSubcategories([]);
+      setNewSubcategoryName("");
+    } catch (error) {
+      console.error('Error updating blog category:', error.message);
+      alert('Error updating blog category: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteBlogCategory = async (categoryId) => {
+    if (!window.confirm("Are you sure you want to delete this blog category?")) return;
+    
+    setLoading(true);
+    try {
+      const { error } = await blogSupabase
+        .from('categories')
+        .delete()
+        .eq('id', categoryId);
+      
+      if (error) throw error;
+      
+      setBlogCategories(blogCategories.filter(category => category.id !== categoryId));
+    } catch (error) {
+      console.error('Error deleting blog category:', error.message);
+      alert('Error deleting blog category: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAddSubcategory = () => {
+    if (!newSubcategoryName.trim()) {
+      alert("Subcategory name cannot be empty");
+      return;
+    }
+    setLocalSubcategories([...localSubcategories, newSubcategoryName.trim()]);
+    setNewSubcategoryName("");
+  };
+
+  const handleDeleteSubcategory = (index) => {
+    setLocalSubcategories(localSubcategories.filter((_, i) => i !== index));
+  };
+
   return (
     <div className="bg-gray-900 text-gray-100 p-6">
       <div className="max-w-7xl mx-auto">
@@ -172,7 +303,7 @@ export default function CategoryManagerPage() {
             Category Management
           </h1>
           <p className="text-gray-400 mt-1">
-            Manage categories for tourist places and shops
+            Manage categories for tourist places, shops, and blogs
           </p>
         </div>
 
@@ -182,12 +313,12 @@ export default function CategoryManagerPage() {
           </div>
         )}
 
-        {/* Main Content */}
+        {/* Shop/Tourist Categories */}
         {!loading && (
-          <div className="bg-gray-800 rounded-2xl shadow-xl p-6">
+          <div className="bg-gray-800 rounded-2xl shadow-xl p-6 mb-8">
             <div className="mb-8">
               <h2 className="text-2xl font-semibold text-gray-100 mb-4">
-                {editingCategory ? "Edit Category" : "Add New Category"}
+                {editingCategory ? "Edit Shop/Tourist Category" : "Add New Shop/Tourist Category"}
               </h2>
               <div className="flex flex-col md:flex-row gap-4 mb-6">
                 <input
@@ -239,7 +370,7 @@ export default function CategoryManagerPage() {
               </div>
               {categories.length === 0 ? (
                 <div className="text-center py-8 bg-gray-700/50 rounded-xl">
-                  <p className="text-gray-400 text-lg">No categories found. Add a category to start!</p>
+                  <p className="text-gray-400 text-lg">No shop/tourist categories found. Add a category to start!</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -262,6 +393,137 @@ export default function CategoryManagerPage() {
                         >
                           Delete
                         </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Blog Categories */}
+        {!loading && (
+          <div className="bg-gray-800 rounded-2xl shadow-xl p-6">
+            <div className="mb-8">
+              <h2 className="text-2xl font-semibold text-gray-100 mb-4">
+                {editingBlogCategory ? "Edit Blog Category" : "Add New Blog Category"}
+              </h2>
+              <div className="flex flex-col md:flex-row gap-4 mb-6">
+                <input
+                  type="text"
+                  value={newBlogCategoryName}
+                  onChange={(e) => setNewBlogCategoryName(e.target.value)}
+                  placeholder="Enter blog category name"
+                  className="px-4 py-3 bg-gray-600 border border-gray-500 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+                {editingBlogCategory ? (
+                  <div className="flex gap-4">
+                    <button
+                      onClick={handleUpdateBlogCategory}
+                      className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-all duration-200 flex items-center gap-2"
+                    >
+                      Update Blog Category
+                    </button>
+                    <button
+                      onClick={() => {
+                        setEditingBlogCategory(null);
+                        setNewBlogCategoryName("");
+                        setLocalSubcategories([]);
+                        setNewSubcategoryName("");
+                      }}
+                      className="px-5 py-2.5 bg-gray-600 hover:bg-gray-500 text-white rounded-lg transition-all duration-200"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={handleAddBlogCategory}
+                    className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-all duration-200 flex items-center gap-2"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
+                    </svg>
+                    Add Blog Category
+                  </button>
+                )}
+              </div>
+
+              {editingBlogCategory && (
+                <div className="mb-6">
+                  <h3 className="text-xl font-semibold text-gray-100 mb-2">Subcategories</h3>
+                  {localSubcategories.length === 0 ? (
+                    <p className="text-gray-400">No subcategories yet.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {localSubcategories.map((sub, index) => (
+                        <div key={index} className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={sub}
+                            onChange={(e) => {
+                              const updated = [...localSubcategories];
+                              updated[index] = e.target.value;
+                              setLocalSubcategories(updated);
+                            }}
+                            className="px-4 py-2 bg-gray-600 border border-gray-500 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 flex-1"
+                          />
+                          <button
+                            onClick={() => handleDeleteSubcategory(index)}
+                            className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors duration-200"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex gap-4 mt-4">
+                    <input
+                      type="text"
+                      value={newSubcategoryName}
+                      onChange={(e) => setNewSubcategoryName(e.target.value)}
+                      placeholder="Enter new subcategory name"
+                      className="px-4 py-3 bg-gray-600 border border-gray-500 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 flex-1"
+                    />
+                    <button
+                      onClick={handleAddSubcategory}
+                      className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-all duration-200"
+                    >
+                      Add Subcategory
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {blogCategories.length === 0 ? (
+                <div className="text-center py-8 bg-gray-700/50 rounded-xl">
+                  <p className="text-gray-400 text-lg">No blog categories found. Add a category to start!</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {blogCategories.map(category => (
+                    <div key={category.id} className="bg-gray-700 p-4 rounded-lg">
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-white font-semibold">{category.name}</span>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleEditBlogCategory(category)}
+                            className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors duration-200"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDeleteBlogCategory(category.id)}
+                            className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors duration-200"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                      <div className="text-gray-400 text-sm">
+                        Subcategories: {category.subcategories?.length > 0 ? category.subcategories.join(', ') : 'None'}
                       </div>
                     </div>
                   ))}
