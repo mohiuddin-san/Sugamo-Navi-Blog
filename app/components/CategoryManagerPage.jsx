@@ -202,7 +202,6 @@ export default function CategoryManagerPage() {
                   onChange={(e) => setNewCategoryType(e.target.value)}
                   className="px-4 py-3 bg-gray-600 border border-gray-500 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 >
-                  <option value="both">Both</option>
                   <option value="shop">Shop</option>
                   <option value="place">Tourist Place</option>
                 </select>

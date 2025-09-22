@@ -1279,13 +1279,13 @@ const saveBlog = async (status: "draft" | "publish", date?: string) => {
 
       <div className="editor-toolbar mb-4">
         <button
-          className="toolbar-button bg-blue-500 text-white px-2 py-1 rounded mr-2"
+          className="toolbar-button bg-blue-500 text-black px-2 py-1 rounded mr-2"
           onClick={() => triggerImageUpload("single")}
         >
           Add Single Image
         </button>
         <button
-          className="toolbar-button bg-blue-500 text-white px-2 py-1 rounded"
+          className="toolbar-button bg-blue-500 text-black px-2 py-1 rounded"
           onClick={() => triggerImageUpload("side-by-side")}
         >
           Add Side-by-Side Images
