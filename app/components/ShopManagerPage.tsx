@@ -15,20 +15,18 @@ export default function ShopApp() {
   const [shops, setShops] = useState([]);
   const [offers, setOffers] = useState([]);
   const [recommendations, setRecommendations] = useState([]);
-  const [categories, setCategories] = useState([]); // New state for categories
+  const [categories, setCategories] = useState([]);
   const [selectedShop, setSelectedShop] = useState(null);
   const [view, setView] = useState("shops");
   const [loading, setLoading] = useState(false);
 
-  // Fetch all data
   useEffect(() => {
     fetchShops();
     fetchOffers();
     fetchRecommendations();
-    fetchCategories(); // Fetch categories
+    fetchCategories();
   }, []);
 
-  // Fetch all categories
   const fetchCategories = async () => {
     try {
       const { data, error } = await supabaseShop
@@ -43,16 +41,12 @@ export default function ShopApp() {
     }
   };
 
-  // Fetch all shops
   const fetchShops = async () => {
     setLoading(true);
     try {
       const { data, error } = await supabaseShop
         .from('shops')
-        .select(`
-          *,
-          categories (name)
-        `)
+        .select('*')
         .order('name');
       
       if (error) throw error;
@@ -64,7 +58,6 @@ export default function ShopApp() {
     }
   };
 
-  // Fetch all offers
   const fetchOffers = async () => {
     try {
       const { data, error } = await supabaseShop
@@ -82,7 +75,6 @@ export default function ShopApp() {
     }
   };
 
-  // Fetch all recommendations
   const fetchRecommendations = async () => {
     try {
       const { data, error } = await supabaseShop
@@ -100,18 +92,16 @@ export default function ShopApp() {
     }
   };
 
-  // Handle shop selection
   const handleShopSelect = (shop) => {
     setSelectedShop(shop);
     setView("editShop");
   };
 
-  // Handle new shop creation
   const handleNewShop = () => {
     setSelectedShop({
       name: "",
       description: "",
-      category: "",
+      category_id: "",
       address: "",
       latitude: null,
       longitude: null,
@@ -127,38 +117,33 @@ export default function ShopApp() {
     setView("editShop");
   };
 
-  // Handle saving shop
   const handleSaveShop = async (shopData) => {
     setLoading(true);
     try {
-      // Remove temporary fields before saving
       const { map_embed, ...saveData } = shopData;
+      const formattedData = { ...saveData };
 
-      if (saveData.id) {
-        // Update existing shop
+      if (formattedData.id) {
         const { data, error } = await supabaseShop
           .from('shops')
-          .update(saveData)
-          .eq('id', saveData.id)
+          .update(formattedData)
+          .eq('id', formattedData.id)
           .select();
         
         if (error) throw error;
         
-        // Update local state
         setShops(shops.map(shop => 
-          shop.id === saveData.id ? data[0] : shop
+          shop.id === formattedData.id ? data[0] : shop
         ));
         setSelectedShop(data[0]);
       } else {
-        // Create new shop
         const { data, error } = await supabaseShop
           .from('shops')
-          .insert([saveData])
+          .insert([formattedData])
           .select();
         
         if (error) throw error;
         
-        // Update local state
         setShops([...shops, data[0]]);
         setSelectedShop(data[0]);
       }
@@ -172,7 +157,6 @@ export default function ShopApp() {
     }
   };
 
-  // Handle deleting shop
   const handleDeleteShop = async (shopId) => {
     if (!window.confirm("Are you sure you want to delete this shop?")) return;
     
@@ -185,7 +169,6 @@ export default function ShopApp() {
       
       if (error) throw error;
       
-      // Update local state
       setShops(shops.filter(shop => shop.id !== shopId));
       setSelectedShop(null);
       setView("shops");
@@ -199,7 +182,6 @@ export default function ShopApp() {
   return (
     <div className="bg-gray-900 text-gray-100 p-6">
       <div className="max-w-7xl mx-auto">
-        {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div>
             <h1 className="text-3xl font-bold bg-gradient-to-r from-indigo-400 to-purple-500 bg-clip-text text-transparent">
@@ -264,12 +246,12 @@ export default function ShopApp() {
           </div>
         )}
 
-        {/* Main Content */}
         {!loading && (
           <div className="bg-gray-800 rounded-2xl shadow-xl p-6">
             {view === "shops" && (
               <ShopList 
                 shops={shops}
+                categories={categories}
                 onShopSelect={handleShopSelect}
                 onShopDelete={handleDeleteShop}
               />
@@ -278,7 +260,7 @@ export default function ShopApp() {
             {view === "editShop" && (
               <ShopEditor 
                 shop={selectedShop}
-                categories={categories} // Pass categories to ShopEditor
+                categories={categories}
                 onSave={handleSaveShop}
                 onCancel={() => setView("shops")}
               />
@@ -308,8 +290,12 @@ export default function ShopApp() {
   );
 }
 
-// ShopList Component
-function ShopList({ shops, onShopSelect, onShopDelete }) {
+function ShopList({ shops, categories, onShopSelect, onShopDelete }) {
+  const getCategoryName = (categoryId) => {
+    const category = categories.find(cat => cat.id === categoryId);
+    return category ? category.name : 'No Category';
+  };
+
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
@@ -365,10 +351,9 @@ function ShopList({ shops, onShopSelect, onShopDelete }) {
               </div>
               <div className="p-5">
                 <h3 className="font-semibold text-xl mb-2 text-white">{shop.name}</h3>
-                <p className="text-indigo-300 text-sm mb-3 capitalize">{shop.categories?.name || 'N/A'}</p>
+                <p className="text-indigo-300 text-sm mb-3 capitalize">{getCategoryName(shop.category_id)}</p>
                 <p className="text-gray-400 text-sm mb-4 line-clamp-2">{shop.description}</p>
                 
-                {/* Display near station if available */}
                 {shop.near_station && (
                   <div className="flex items-center text-sm text-gray-400 mb-2">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
@@ -406,10 +391,11 @@ function ShopList({ shops, onShopSelect, onShopDelete }) {
   );
 }
 
-// ShopEditor Component with Image Upload
 function ShopEditor({ shop, categories, onSave, onCancel }) {
+  console.log('ShopEditor shop prop:', shop);
   const [formData, setFormData] = useState({
     ...shop,
+    category_id: shop.category_id || '',
     other_images: shop.other_images || [],
     map_embed: '',
     opening_hours: shop.opening_hours || "",
@@ -453,7 +439,6 @@ function ShopEditor({ shop, categories, onSave, onCancel }) {
     onSave(formData);
   };
 
-  // Upload main shop image
   const uploadImage = async (e) => {
     try {
       setUploading(true);
@@ -467,19 +452,16 @@ function ShopEditor({ shop, categories, onSave, onCancel }) {
       const fileName = `${Math.random()}.${fileExt}`;
       const filePath = `shop-images/${fileName}`;
       
-      // Upload to Supabase Storage
       const { error: uploadError } = await supabaseShop.storage
         .from('shop-images')
         .upload(filePath, file);
       
       if (uploadError) throw uploadError;
       
-      // Get public URL
       const { data: { publicUrl } } = supabaseShop.storage
         .from('shop-images')
         .getPublicUrl(filePath);
       
-      // Update form data with image URL
       setFormData((prev) => ({ ...prev, image_url: publicUrl }));
       
     } catch (error) {
@@ -490,12 +472,10 @@ function ShopEditor({ shop, categories, onSave, onCancel }) {
     }
   };
 
-  // Remove main shop image
   const removeImage = () => {
     setFormData((prev) => ({ ...prev, image_url: '' }));
   };
 
-  // Upload other images
   const uploadOtherImage = async (e) => {
     try {
       setUploadingOther(true);
@@ -509,19 +489,16 @@ function ShopEditor({ shop, categories, onSave, onCancel }) {
       const fileName = `${Math.random()}.${fileExt}`;
       const filePath = `shop-other-images/${fileName}`;
       
-      // Upload to Supabase Storage
       const { error: uploadError } = await supabaseShop.storage
         .from('shop-other-images')
         .upload(filePath, file);
       
       if (uploadError) throw uploadError;
       
-      // Get public URL
       const { data: { publicUrl } } = supabaseShop.storage
         .from('shop-other-images')
         .getPublicUrl(filePath);
       
-      // Add to other images array
       setFormData((prev) => ({ ...prev, other_images: [...prev.other_images, publicUrl] }));
       
     } catch (error) {
@@ -532,7 +509,6 @@ function ShopEditor({ shop, categories, onSave, onCancel }) {
     }
   };
 
-  // Remove other image
   const removeOtherImage = (index) => {
     setFormData((prev) => ({
       ...prev,
@@ -546,7 +522,6 @@ function ShopEditor({ shop, categories, onSave, onCancel }) {
       
       <form onSubmit={handleSubmit} className="space-y-8">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Left Column - Basic Info */}
           <div className="space-y-6">
             <div className="bg-gray-700 p-5 rounded-xl">
               <h3 className="text-lg font-medium text-white mb-4 flex items-center gap-2">
@@ -572,8 +547,8 @@ function ShopEditor({ shop, categories, onSave, onCancel }) {
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">Category *</label>
                   <select
-                    name="category"
-                    value={formData.category}
+                    name="category_id"
+                    value={formData.category_id}
                     onChange={handleChange}
                     className="w-full px-4 py-3 bg-gray-600 border border-gray-500 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     required
@@ -663,7 +638,6 @@ function ShopEditor({ shop, categories, onSave, onCancel }) {
             </div>
           </div>
           
-          {/* Right Column - Contact & Images */}
           <div className="space-y-6">
             <div className="bg-gray-700 p-5 rounded-xl">
               <h3 className="text-lg font-medium text-white mb-4 flex items-center gap-2">
@@ -728,7 +702,6 @@ function ShopEditor({ shop, categories, onSave, onCancel }) {
               </div>
             </div>
             
-            {/* Image Upload Section */}
             <div className="bg-gray-700 p-5 rounded-xl">
               <h3 className="text-lg font-medium text-white mb-4 flex items-center gap-2">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-indigo-400" viewBox="0 0 20 20" fill="currentColor">
@@ -824,7 +797,6 @@ function ShopEditor({ shop, categories, onSave, onCancel }) {
           </div>
         </div>
         
-        {/* Form Actions */}
         <div className="flex justify-end space-x-4 pt-8 border-t border-gray-600">
           <button
             type="button"

@@ -13,15 +13,15 @@ const supabaseTourist = createClient(supabaseTouristUrl || '', supabaseTouristKe
 
 export default function SeeAndDoManagerPage() {
   const [places, setPlaces] = useState([]);
-  const [categories, setCategories] = useState([]); // New state for categories
+  const [categories, setCategories] = useState([]);
   const [selectedPlace, setSelectedPlace] = useState(null);
   const [view, setView] = useState("places");
   const [loading, setLoading] = useState(false);
 
   // Fetch all tourist places and categories
   useEffect(() => {
-    fetchPlaces();
     fetchCategories();
+    fetchPlaces();
   }, []);
 
   // Fetch all categories
@@ -46,8 +46,11 @@ export default function SeeAndDoManagerPage() {
       const { data, error } = await supabaseTourist
         .from('tourist_places')
         .select(`
-          *,
-          categories (name)
+          id, name, description, address, latitude, longitude, contact_phone, 
+          contact_email, opening_hours, rating, review_count, image_url, 
+          other_images, map_embed, love_count, near_station, is_recommended, 
+          created_at, updated_at, category_id,
+          categories:category_id (name)
         `)
         .order('name');
       
@@ -55,6 +58,37 @@ export default function SeeAndDoManagerPage() {
       setPlaces(data);
     } catch (error) {
       console.error('Error fetching tourist places:', error.message);
+      // Fallback: Fetch places without join and map category names
+      try {
+        const { data: placesData, error: placesError } = await supabaseTourist
+          .from('tourist_places')
+          .select('*')
+          .order('name');
+        
+        if (placesError) throw placesError;
+        
+        // Map category_id to category name
+        const enrichedPlaces = await Promise.all(placesData.map(async (place) => {
+          if (place.category_id) {
+            const { data: categoryData, error: categoryError } = await supabaseTourist
+              .from('categories')
+              .select('name')
+              .eq('id', place.category_id)
+              .single();
+            
+            if (categoryError) {
+              console.error(`Error fetching category for place ${place.id}:`, categoryError.message);
+              return { ...place, categories: { name: 'N/A' } };
+            }
+            return { ...place, categories: { name: categoryData.name } };
+          }
+          return { ...place, categories: { name: 'N/A' } };
+        }));
+        
+        setPlaces(enrichedPlaces);
+      } catch (fallbackError) {
+        console.error('Fallback fetch failed:', fallbackError.message);
+      }
     } finally {
       setLoading(false);
     }
@@ -71,7 +105,7 @@ export default function SeeAndDoManagerPage() {
     setSelectedPlace({
       name: "",
       description: "",
-      category: "",
+      category_id: "",
       address: "",
       latitude: null,
       longitude: null,
@@ -94,7 +128,7 @@ export default function SeeAndDoManagerPage() {
     setLoading(true);
     try {
       // Remove temporary fields before saving
-      const { map_embed, ...saveData } = placeData;
+      const { map_embed, categories, ...saveData } = placeData; // Exclude categories object
 
       if (saveData.id) {
         // Update existing place
@@ -102,7 +136,13 @@ export default function SeeAndDoManagerPage() {
           .from('tourist_places')
           .update(saveData)
           .eq('id', saveData.id)
-          .select();
+          .select(`
+            id, name, description, address, latitude, longitude, contact_phone, 
+            contact_email, opening_hours, rating, review_count, image_url, 
+            other_images, map_embed, love_count, near_station, is_recommended, 
+            created_at, updated_at, category_id,
+            categories:category_id (name)
+          `);
         
         if (error) throw error;
         
@@ -116,7 +156,13 @@ export default function SeeAndDoManagerPage() {
         const { data, error } = await supabaseTourist
           .from('tourist_places')
           .insert([saveData])
-          .select();
+          .select(`
+            id, name, description, address, latitude, longitude, contact_phone, 
+            contact_email, opening_hours, rating, review_count, image_url, 
+            other_images, map_embed, love_count, near_station, is_recommended, 
+            created_at, updated_at, category_id,
+            categories:category_id (name)
+          `);
         
         if (error) throw error;
         
@@ -153,6 +199,7 @@ export default function SeeAndDoManagerPage() {
       setView("places");
     } catch (error) {
       console.error('Error deleting tourist place:', error.message);
+      alert('Error deleting tourist place: ' + error.message);
     } finally {
       setLoading(false);
     }
@@ -218,7 +265,7 @@ export default function SeeAndDoManagerPage() {
             {view === "editPlace" && (
               <PlaceEditor 
                 place={selectedPlace}
-                categories={categories} // Pass categories to PlaceEditor
+                categories={categories}
                 onSave={handleSavePlace}
                 onCancel={() => setView("places")}
               />
@@ -336,7 +383,8 @@ function PlaceEditor({ place, categories, onSave, onCancel }) {
     near_station: place.near_station || "",
     rating: place.rating || 0,
     review_count: place.review_count || 0,
-    love_count: place.love_count || 0
+    love_count: place.love_count || 0,
+    category_id: place.category_id || ""
   });
   const [uploading, setUploading] = useState(false);
   const [uploadingOther, setUploadingOther] = useState(false);
@@ -489,8 +537,8 @@ function PlaceEditor({ place, categories, onSave, onCancel }) {
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">Category *</label>
                   <select
-                    name="category"
-                    value={formData.category}
+                    name="category_id"
+                    value={formData.category_id}
                     onChange={handleChange}
                     className="w-full px-4 py-3 bg-gray-600 border border-gray-500 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     required
