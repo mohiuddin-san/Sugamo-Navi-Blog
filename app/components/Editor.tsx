@@ -7,7 +7,7 @@ import rehypeRaw from "rehype-raw";
 import "highlight.js/styles/github.css";
 import OGPPreview from "~/components/OGPPreview";
 import supabase from "~/supabase";
-import { FiImage, FiX, FiUpload, FiChevronDown, FiChevronUp } from "react-icons/fi";
+import { FiImage, FiX, FiUpload } from "react-icons/fi";
 import { toString } from 'mdast-util-to-string';
 
 // Simple debounce function
@@ -37,9 +37,13 @@ type EditorProps = {
 };
 
 type Category = {
-  id: string;
+  id: number;
   name: string;
-  subcategories?: { id: string; name: string }[];
+};
+
+type Subcategory = {
+  id: number;
+  name: string;
 };
 
 export default function Editor({
@@ -60,20 +64,18 @@ export default function Editor({
   const [cursorPosition, setCursorPosition] = useState(0);
   const [cursorNode, setCursorNode] = useState<Node | null>(null);
   const [cursorOffset, setCursorOffset] = useState(0);
-  const [showDateDialog, setShowDateDialog] = useState(false);
   const [publishDate, setPublishDate] = useState("");
   const [blogId, setBlogId] = useState<string | null>(initialBlogId || null);
   const [topImage, setTopImage] = useState<string | null>(null);
   const [topImageFileName, setTopImageFileName] = useState<string | null>(null);
   const [categoriesList, setCategoriesList] = useState<Category[]>([]);
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [subcategoriesList, setSubcategoriesList] = useState<Subcategory[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<string>("");
   const [selectedSubcategories, setSelectedSubcategories] = useState<string[]>([]);
   const [newCategory, setNewCategory] = useState("");
   const [newSubcategory, setNewSubcategory] = useState("");
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
   const [showSubcategoryDropdown, setShowSubcategoryDropdown] = useState(false);
-  const [selectedCategoryForSubcategory, setSelectedCategoryForSubcategory] = useState<string | null>(null);
-  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
   const [imageLayout, setImageLayout] = useState<"single" | "side-by-side">("single");
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -88,26 +90,35 @@ export default function Editor({
   const subcategoryInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const fetchCategories = async () => {
+    const fetchCategoriesAndSubcategories = async () => {
       const { data: categoriesData, error: categoriesError } = await supabase
         .from("categories")
-        .select("id, name, subcategories")
+        .select("id, name")
         .order("name", { ascending: true });
 
       if (categoriesError) {
         console.error("Error fetching categories:", categoriesError);
+        alert("Failed to fetch categories: " + categoriesError.message);
         return;
       }
 
-      const categoriesWithSubcategories = categoriesData.map((category) => ({
-        ...category,
-        subcategories: category.subcategories || [],
-      }));
+      setCategoriesList(categoriesData || []);
 
-      setCategoriesList(categoriesWithSubcategories);
+      const { data: subcategoriesData, error: subcategoriesError } = await supabase
+        .from("subcategories")
+        .select("id, name")
+        .order("name", { ascending: true });
+
+      if (subcategoriesError) {
+        console.error("Error fetching subcategories:", subcategoriesError);
+        alert("Failed to fetch subcategories: " + subcategoriesError.message);
+        return;
+      }
+
+      setSubcategoriesList(subcategoriesData || []);
     };
 
-    fetchCategories();
+    fetchCategoriesAndSubcategories();
   }, []);
 
   useEffect(() => {
@@ -119,53 +130,70 @@ export default function Editor({
     }
   }, [content, title]);
 
-  useEffect(() => {
-    if (initialBlogId === null || initialBlogId === "new") {
-      setContent("");
-      setTitle("");
-      setSelectedCategories([]);
-      setSelectedSubcategories([]);
-      setTopImage(null);
-      setTopImageFileName(null);
-      setBlogId(null);
-    } else if (initialBlogId !== blogId) {
-      const fetchBlog = async () => {
-        const { data, error } = await supabase
-          .from("blogs")
-          .select("title, details, top_image, status, publish_date, category_id")
-          .eq("id", initialBlogId)
+useEffect(() => {
+  if (initialBlogId === null || initialBlogId === "new") {
+    setContent("");
+    setTitle("");
+    setSelectedCategory("");
+    setSelectedSubcategories([]);
+    setTopImage(null);
+    setTopImageFileName(null);
+    setBlogId(null);
+    setPublishDate(""); // Reset publish date for new blog
+  } else if (initialBlogId !== blogId) {
+    const fetchBlog = async () => {
+      const { data, error } = await supabase
+        .from("blogs")
+        .select("id, title, details, top_image, publish_date, category_id, subcategory_ids")
+        .eq("id", initialBlogId)
+        .single();
+      if (error) {
+        console.error("Fetch blog error:", error);
+        alert("Failed to load blog: " + error.message);
+        return;
+      }
+      setTitle(data.title || "");
+      setContent(data.details || "");
+      setTopImage(data.top_image || null);
+      setPublishDate(data.publish_date ? new Date(data.publish_date).toISOString().split("T")[0] : "");
+      setBlogId(initialBlogId);
+
+      // Set category
+      if (data.category_id) {
+        const { data: categoryData, error: categoryError } = await supabase
+          .from("categories")
+          .select("name")
+          .eq("id", data.category_id)
           .single();
-        if (error) {
-          console.error("Fetch blog error:", error);
-          alert("Failed to load blog");
+        if (categoryError) {
+          console.error("Fetch category error:", categoryError);
+          alert("Failed to fetch category: " + categoryError.message);
           return;
         }
-        setTitle(data.title || "");
-        setContent(data.details || "");
-        setTopImage(data.top_image || null);
-        setBlogId(initialBlogId);
+        setSelectedCategory(categoryData.name || "");
+      } else {
+        setSelectedCategory("");
+      }
 
-        if (data.category_id) {
-          const { data: categoryData, error: categoryError } = await supabase
-            .from("categories")
-            .select("name, subcategories")
-            .eq("id", data.category_id)
-            .single();
-          if (categoryError) {
-            console.error("Fetch category error:", categoryError);
-            alert("Failed to fetch category: " + categoryError.message);
-            return;
-          }
-          setSelectedCategories(categoryData.name ? [categoryData.name] : []);
-          setSelectedSubcategories((categoryData.subcategories || []).map((sub: { name: string }) => sub.name));
-        } else {
-          setSelectedCategories([]);
-          setSelectedSubcategories([]);
+      // Set subcategories
+      if (data.subcategory_ids && data.subcategory_ids.length > 0) {
+        const { data: subcategoriesData, error: subcategoriesError } = await supabase
+          .from("subcategories")
+          .select("name")
+          .in("id", data.subcategory_ids);
+        if (subcategoriesError) {
+          console.error("Fetch subcategories error:", subcategoriesError);
+          alert("Failed to fetch subcategories: " + subcategoriesError.message);
+          return;
         }
-      };
-      fetchBlog();
-    }
-  }, [initialBlogId, blogId]);
+        setSelectedSubcategories(subcategoriesData.map(sub => sub.name) || []);
+      } else {
+        setSelectedSubcategories([]);
+      }
+    };
+    fetchBlog();
+  }
+}, [initialBlogId, blogId]);
 
   const togglePreview = useCallback(() => {
     const newPreviewState = !isPreview;
@@ -506,180 +534,188 @@ ${imageHtmls.map(html => `<div style="flex: 1;">${html}</div>`).join("\n")}
     }, 0);
   };
 
-const saveBlog = async (status: "draft" | "publish", date?: string) => {
-  if (!title) {
-    alert("Please enter a title");
-    return;
-  }
-
-  if (selectedCategories.length === 0 && !newCategory.trim()) {
-    alert("Please select or add at least one category");
-    return;
-  }
-
-  // Check if user is authenticated
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
-  if (authError || !user) {
-    alert("You must be logged in to save a blog");
-    console.error("Auth error:", authError);
-    return;
-  }
-  console.log("Authenticated User ID:", user.id);
-
-  // Get or create category
-  const allCategories = [...selectedCategories, newCategory.trim()].filter(
-    (cat, index, self) => cat && self.indexOf(cat) === index
-  );
-  const allSubcategories = [...selectedSubcategories, newSubcategory.trim()].filter(
-    (subcat, index, self) => subcat && self.indexOf(subcat) === index
-  );
-  console.log("Saving categories:", allCategories, "Subcategories:", allSubcategories);
-
-  let categoryId: number | null = null;
-  if (allCategories.length > 0) {
-    const primaryCategory = allCategories[0];
-    console.log("Processing category:", primaryCategory);
-    const { data: existingCategory, error: findError } = await supabase
-      .from("categories")
-      .select("id, subcategories")
-      .eq("name", primaryCategory)
-      .maybeSingle();  // Changed to .maybeSingle() to handle 0 rows gracefully
-
-    if (findError) {
-      console.error("Category fetch error:", findError);
-      alert("Failed to fetch category: " + findError.message);
+  const saveBlog = async (status: "draft" | "publish", date?: string) => {
+    if (!title) {
+      alert("Please enter a title");
       return;
     }
 
-    if (existingCategory) {
-      categoryId = existingCategory.id;
-      console.log("Existing category ID:", categoryId, "Current subcategories:", existingCategory.subcategories);
-      // Always update subcategories, even if empty
-      const existingSubcategories = Array.isArray(existingCategory.subcategories) ? existingCategory.subcategories : [];
-      const newSubcategories = allSubcategories
-        .filter(name => !existingSubcategories.some((sub: { name: string }) => sub.name === name))
-        .map((name, index) => ({
-          id: `${categoryId}-${index}-${Date.now()}`,
-          name,
-        }));
-      const updatedSubcategories = [...existingSubcategories, ...newSubcategories];
-      console.log("Updating subcategories to:", updatedSubcategories);
-
-      const { error: updateError } = await supabase
-        .from("categories")
-        .update({ subcategories: updatedSubcategories.length > 0 ? updatedSubcategories : [] })
-        .eq("id", categoryId);
-      if (updateError) {
-        console.error("Subcategory update error:", updateError);
-        alert("Failed to update subcategories: " + updateError.message);
-        return;
-      }
-      console.log("Subcategories updated successfully for category ID:", categoryId);
-    } else {
-      // No existing category, create new one
-      const newSubcategories = allSubcategories.map((name, index) => ({
-        id: `new-${index}-${Date.now()}`,
-        name,
-      }));
-      console.log("Creating new category:", primaryCategory, "with subcategories:", newSubcategories);
-      const { data: newCat, error: insertError } = await supabase
-        .from("categories")
-        .insert([{ name: primaryCategory, subcategories: newSubcategories.length > 0 ? newSubcategories : [] }])
-        .select("id")
-        .single();
-      if (insertError) {
-        console.error("Category insert error:", insertError);
-        alert("Failed to create category: " + insertError.message);
-        return;
-      }
-      categoryId = newCat.id;
-      console.log("New category created with ID:", categoryId);
+    if (!selectedCategory && !newCategory.trim()) {
+      alert("Please select or add a category");
+      return;
     }
-  }
 
-  const payload = {
-    title,
-    top_image: topImage || null,
-    details: content,
-    status,
-    publish_date: status === "publish" ? date : null,
-    user_id: user.id,
-    category_id: categoryId,
+    if (status === "publish" && !date) {
+      alert("Please select a publish date");
+      return;
+    }
+
+    // Check if user is authenticated
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      alert("You must be logged in to save a blog");
+      console.error("Auth error:", authError);
+      return;
+    }
+    console.log("Authenticated User ID:", user.id);
+
+    // Get or create category
+    const categoryName = newCategory.trim() || selectedCategory;
+    let categoryId: number | null = null;
+    if (categoryName) {
+      console.log("Processing category:", categoryName);
+      const { data: existingCategory, error: findError } = await supabase
+        .from("categories")
+        .select("id")
+        .eq("name", categoryName)
+        .maybeSingle();
+
+      if (findError) {
+        console.error("Category fetch error:", findError);
+        alert("Failed to fetch category: " + findError.message);
+        return;
+      }
+
+      if (existingCategory) {
+        categoryId = existingCategory.id;
+        console.log("Existing category ID:", categoryId);
+      } else {
+        console.log("Creating new category:", categoryName);
+        const { data: newCat, error: insertError } = await supabase
+          .from("categories")
+          .insert([{ name: categoryName }])
+          .select("id")
+          .single();
+        if (insertError) {
+          console.error("Category insert error:", insertError);
+          alert("Failed to create category: " + insertError.message);
+          return;
+        }
+        categoryId = newCat.id;
+        console.log("New category created with ID:", categoryId);
+        setCategoriesList([...categoriesList, { id: categoryId, name: categoryName }]);
+        setSelectedCategory(categoryName);
+        setNewCategory("");
+      }
+    }
+
+    // Get or create subcategories
+    const allSubcategories = [...selectedSubcategories, newSubcategory.trim()].filter(
+      (subcat, index, self) => subcat && self.indexOf(subcat) === index
+    );
+    let subcategoryIds: number[] = [];
+    for (const subcatName of allSubcategories) {
+      if (!subcatName) continue;
+      const { data: existingSubcategory, error: findError } = await supabase
+        .from("subcategories")
+        .select("id")
+        .eq("name", subcatName)
+        .maybeSingle();
+
+      if (findError) {
+        console.error("Subcategory fetch error:", findError);
+        alert("Failed to fetch subcategory: " + findError.message);
+        return;
+      }
+
+      if (existingSubcategory) {
+        subcategoryIds.push(existingSubcategory.id);
+        console.log("Existing subcategory ID:", existingSubcategory.id);
+      } else {
+        console.log("Creating new subcategory:", subcatName);
+        const { data: newSubcat, error: insertError } = await supabase
+          .from("subcategories")
+          .insert([{ name: subcatName, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }])
+          .select("id")
+          .single();
+        if (insertError) {
+          console.error("Subcategory insert error:", insertError);
+          alert("Failed to create subcategory: " + insertError.message);
+          return;
+        }
+        subcategoryIds.push(newSubcat.id);
+        console.log("New subcategory created with ID:", newSubcat.id);
+        setSubcategoriesList([...subcategoriesList, { id: newSubcat.id, name: subcatName }]);
+      }
+    }
+
+    const blogPayload = {
+      title,
+      top_image: topImage || null,
+      details: content,
+      status,
+      publish_date: status === "publish" ? date : null,
+      user_id: user.id,
+      category_id: categoryId,
+      subcategory_ids: subcategoryIds.length > 0 ? subcategoryIds : null,
+      updated_at: new Date().toISOString(),
+    };
+    console.log("Saving blog with payload:", blogPayload);
+
+    try {
+      let currentBlogId = blogId;
+      if (blogId) {
+        // Update existing blog
+        const { error } = await supabase
+          .from("blogs")
+          .update(blogPayload)
+          .eq("id", blogId)
+          .eq("user_id", user.id);
+        if (error) {
+          console.error("Update blog error:", error);
+          if (error.code === "42501") {
+            alert("You don't have permission to update this blog. Ensure you own this blog.");
+          } else if (error.message.includes("No API key found")) {
+            alert("API key is missing. Please check your Supabase configuration.");
+          } else {
+            alert("Failed to update blog: " + error.message);
+          }
+          return;
+        }
+        console.log("Blog updated successfully, Blog ID:", blogId);
+        alert("Blog updated successfully!");
+      } else {
+        // Create new blog
+        const { data, error } = await supabase
+          .from("blogs")
+          .insert([blogPayload])
+          .select("id")
+          .single();
+        if (error) {
+          console.error("Insert blog error:", error);
+          if (error.message.includes("No API key found")) {
+            alert("API key is missing. Please check your Supabase configuration.");
+          } else if (error.code === "42501") {
+            alert("You don't have permission to create a blog.");
+          } else {
+            alert("Failed to save blog: " + error.message);
+          }
+          return;
+        }
+        currentBlogId = data.id;
+        console.log("New Blog ID:", currentBlogId);
+        setBlogId(currentBlogId);
+        alert("Blog saved successfully!");
+      }
+
+      setSelectedSubcategories(allSubcategories.slice(0, -1));
+      setNewSubcategory("");
+    } catch (error: any) {
+      console.error("Save blog error:", error);
+      alert("An unexpected error occurred while saving the blog: " + (error.message || "Unknown error"));
+    }
   };
-  console.log("Saving blog with payload:", payload);
 
-  try {
-    let currentBlogId = blogId;
-    if (blogId) {
-      // Update existing blog
-      const { error } = await supabase
-        .from("blogs")
-        .update(payload)
-        .eq("id", blogId)
-        .eq("user_id", user.id);
-      if (error) {
-        console.error("Update blog error:", error);
-        if (error.code === "42501") {
-          alert("You don't have permission to update this blog. Ensure you own this blog.");
-        } else if (error.message.includes("No API key found")) {
-          alert("API key is missing. Please check your Supabase configuration.");
-        } else {
-          alert("Failed to update blog: " + error.message);
-        }
-        return;
-      }
-      console.log("Blog updated successfully, Blog ID:", blogId);
-      alert("Blog updated successfully!");
-    } else {
-      // Create new blog
-      const { data, error } = await supabase
-        .from("blogs")
-        .insert([payload])
-        .select("id")
-        .single();
-      if (error) {
-        console.error("Insert blog error:", error);
-        if (error.message.includes("No API key found")) {
-          alert("API key is missing. Please check your Supabase configuration.");
-        } else if (error.code === "42501") {
-          alert("You don't have permission to create a blog.");
-        } else {
-          alert("Failed to save blog: " + error.message);
-        }
-        return;
-      }
-      currentBlogId = data.id;
-      console.log("New Blog ID:", currentBlogId);
-      setBlogId(currentBlogId);
-      alert("Blog saved successfully!");
-    }
-
-    setSelectedCategories(allCategories.slice(0, -1));
-    setSelectedSubcategories(allSubcategories.slice(0, -1));
-    setNewCategory("");
-    setNewSubcategory("");
-    setSelectedCategoryForSubcategory(null);
-  } catch (error: any) {
-    console.error("Save blog error:", error);
-    alert("An unexpected error occurred while saving the blog: " + (error.message || "Unknown error"));
-  }
-};
   const handleSaveDraft = () => {
     saveBlog("draft");
   };
 
   const handlePublish = () => {
-    setShowDateDialog(true);
-  };
-
-  const confirmPublish = () => {
     if (!publishDate) {
       alert("Please select a publish date");
       return;
     }
     saveBlog("publish", new Date(publishDate).toISOString());
-    setShowDateDialog(false);
-    setPublishDate("");
   };
 
   const toggleCategoryDropdown = () => {
@@ -688,22 +724,9 @@ const saveBlog = async (status: "draft" | "publish", date?: string) => {
   };
 
   const selectCategory = (categoryName: string) => {
-    if (!selectedCategories.includes(categoryName)) {
-      setSelectedCategories([...selectedCategories, categoryName]);
-      setSelectedCategoryForSubcategory(categoriesList.find(cat => cat.name === categoryName)?.id || null);
-    }
+    setSelectedCategory(categoryName);
     setNewCategory("");
     setShowCategoryDropdown(false);
-  };
-
-  const removeSelectedCategory = (categoryName: string) => {
-    setSelectedCategories(selectedCategories.filter(cat => cat !== categoryName));
-    // Remove subcategories associated with this category
-    const category = categoriesList.find(cat => cat.name === categoryName);
-    if (category && category.subcategories) {
-      const subcatNames = category.subcategories.map(sub => sub.name);
-      setSelectedSubcategories(selectedSubcategories.filter(sub => !subcatNames.includes(sub)));
-    }
   };
 
   const handleCategoryInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -711,8 +734,8 @@ const saveBlog = async (status: "draft" | "publish", date?: string) => {
   };
 
   const handleCategoryKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && newCategory.trim() && !selectedCategories.includes(newCategory.trim())) {
-      setSelectedCategories([...selectedCategories, newCategory.trim()]);
+    if (e.key === 'Enter' && newCategory.trim()) {
+      setSelectedCategory(newCategory.trim());
       setNewCategory("");
       setShowCategoryDropdown(false);
     } else if (e.key === 'Escape') {
@@ -935,13 +958,8 @@ const saveBlog = async (status: "draft" | "publish", date?: string) => {
     }
   }, [cursorNode, cursorOffset]);
 
-  const availableCategories = categoriesList.filter(cat => !selectedCategories.includes(cat.name));
-  const availableSubcategories = selectedCategories.length > 0
-    ? categoriesList
-        .filter(cat => selectedCategories.includes(cat.name))
-        .flatMap(cat => cat.subcategories || [])
-        .filter(subcat => !selectedSubcategories.includes(subcat.name))
-    : [];
+  const availableCategories = categoriesList.filter(cat => cat.name !== selectedCategory);
+  const availableSubcategories = subcategoriesList.filter(subcat => !selectedSubcategories.includes(subcat.name));
 
   return (
     <div className="w-full bg-white p-5" ref={editorContainerRef}>
@@ -1014,22 +1032,21 @@ const saveBlog = async (status: "draft" | "publish", date?: string) => {
       </div>
 
       <div className="category-section mb-4">
-        <label className="section-label block mb-2 font-semibold">Categories</label>
+        <label className="section-label block mb-2 font-semibold">Category</label>
         <div className="selected-items flex flex-wrap gap-2 mb-4">
-          {selectedCategories.map((cat, index) => (
+          {selectedCategory && (
             <span
-              key={`cat-${index}`}
               className="category-tag bg-blue-100 text-blue-800 rounded px-2 py-1 flex items-center"
             >
-              {cat}
+              {selectedCategory}
               <button
-                onClick={() => removeSelectedCategory(cat)}
+                onClick={() => setSelectedCategory("")}
                 className="remove-category ml-2 hover:bg-red-200 rounded"
               >
                 <FiX size={12} />
               </button>
             </span>
-          ))}
+          )}
         </div>
         <div className="category-input-container relative">
           <input
@@ -1041,6 +1058,7 @@ const saveBlog = async (status: "draft" | "publish", date?: string) => {
             placeholder="Select or type category name"
             className="w-full p-2 border rounded"
             onKeyDown={handleCategoryKeyDown}
+            disabled={!!selectedCategory}
           />
           {showCategoryDropdown && (
             <div className="category-dropdown absolute z-10 bg-white border rounded shadow-lg mt-1 w-full max-h-60 overflow-y-auto">
@@ -1062,18 +1080,7 @@ const saveBlog = async (status: "draft" | "publish", date?: string) => {
                       className="category-option p-3 hover:bg-gray-100 cursor-pointer border-b last:border-b-0"
                       onClick={() => selectCategory(category.name)}
                     >
-                      <div className="flex justify-between items-center">
-                        <span className="font-medium">{category.name}</span>
-                        <span className="text-sm text-gray-500">
-                          {category.subcategories?.length || 0} subcategories
-                        </span>
-                      </div>
-                      {category.subcategories && category.subcategories.length > 0 && (
-                        <div className="mt-2 text-sm text-gray-600">
-                          Examples: {category.subcategories.slice(0, 2).map(sub => sub.name).join(", ")}
-                          {category.subcategories.length > 2 && "..."}
-                        </div>
-                      )}
+                      <span className="font-medium">{category.name}</span>
                     </div>
                   ))}
                 </div>
@@ -1125,94 +1132,72 @@ const saveBlog = async (status: "draft" | "publish", date?: string) => {
             </span>
           ))}
         </div>
-        {selectedCategories.length === 0 && (
-          <div className="text-center py-4 text-gray-500 bg-gray-50 rounded p-3">
-            <p>Select at least one category first to see available subcategories</p>
-          </div>
-        )}
-        {selectedCategories.length > 0 && (
-          <div className="subcategory-input-container relative">
-            <input
-              ref={subcategoryInputRef}
-              type="text"
-              value={newSubcategory}
-              onChange={handleSubcategoryInputChange}
-              onFocus={toggleSubcategoryDropdown}
-              placeholder={
-                selectedCategories.length > 0
-                  ? `Select subcategory from ${selectedCategories.join(", ")} or type new`
-                  : "Select category first"
-              }
-              className="w-full p-2 border rounded"
-              onKeyDown={handleSubcategoryKeyDown}
-              disabled={selectedCategories.length === 0}
-            />
-            {showSubcategoryDropdown && selectedCategories.length > 0 && (
-              <div className="subcategory-dropdown absolute z-10 bg-white border rounded shadow-lg mt-1 w-full max-h-60 overflow-y-auto">
-                <div className="p-2 border-b">
-                  <input
-                    type="text"
-                    value={newSubcategory}
-                    onChange={handleSubcategoryInputChange}
-                    placeholder="Type to create new subcategory"
-                    className="w-full p-2 border rounded"
-                    onKeyDown={handleSubcategoryKeyDown}
-                  />
-                </div>
-                {availableSubcategories.length > 0 && (
-                  <div className="subcategory-list">
-                    {availableSubcategories.map((subcategory) => {
-                      const parentCategory = categoriesList.find(cat =>
-                        cat.subcategories?.some(sub => sub.id === subcategory.id)
-                      );
-                      return (
-                        <div
-                          key={subcategory.id}
-                          className="subcategory-option p-3 hover:bg-gray-100 cursor-pointer border-b last:border-b-0"
-                          onClick={() => selectSubcategory(subcategory.name)}
-                        >
-                          <div className="flex justify-between items-center">
-                            <span className="font-medium">{subcategory.name}</span>
-                            <span className="text-sm text-gray-500">
-                              {parentCategory?.name}
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-                {availableSubcategories.length === 0 && newSubcategory.trim() && (
-                  <div className="p-3 text-center text-gray-500">
-                    Press Enter to create "{newSubcategory}" as new subcategory
-                  </div>
-                )}
-                <div className="p-2 border-t flex justify-between">
-                  <button
-                    onClick={() => {
-                      if (newSubcategory.trim()) {
-                        selectSubcategory(newSubcategory.trim());
-                      }
-                    }}
-                    className="bg-green-500 text-white px-3 py-1 rounded text-sm"
-                    disabled={!newSubcategory.trim() || selectedCategories.length === 0}
-                  >
-                    Add Subcategory
-                  </button>
-                  <button
-                    onClick={toggleSubcategoryDropdown}
-                    className="text-gray-500 hover:text-gray-700 text-sm"
-                  >
-                    Close
-                  </button>
-                </div>
+        <div className="subcategory-input-container relative">
+          <input
+            ref={subcategoryInputRef}
+            type="text"
+            value={newSubcategory}
+            onChange={handleSubcategoryInputChange}
+            onFocus={toggleSubcategoryDropdown}
+            placeholder="Select or type subcategory name"
+            className="w-full p-2 border rounded"
+            onKeyDown={handleSubcategoryKeyDown}
+          />
+          {showSubcategoryDropdown && (
+            <div className="subcategory-dropdown absolute z-10 bg-white border rounded shadow-lg mt-1 w-full max-h-60 overflow-y-auto">
+              <div className="p-2 border-b">
+                <input
+                  type="text"
+                  value={newSubcategory}
+                  onChange={handleSubcategoryInputChange}
+                  placeholder="Type to create new subcategory"
+                  className="w-full p-2 border rounded"
+                  onKeyDown={handleSubcategoryKeyDown}
+                />
               </div>
-            )}
-          </div>
-        )}
-        {selectedCategories.length > 0 && availableSubcategories.length === 0 && !showSubcategoryDropdown && (
+              {availableSubcategories.length > 0 && (
+                <div className="subcategory-list">
+                  {availableSubcategories.map((subcategory) => (
+                    <div
+                      key={subcategory.id}
+                      className="subcategory-option p-3 hover:bg-gray-100 cursor-pointer border-b last:border-b-0"
+                      onClick={() => selectSubcategory(subcategory.name)}
+                    >
+                      <span className="font-medium">{subcategory.name}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {availableSubcategories.length === 0 && newSubcategory.trim() && (
+                <div className="p-3 text-center text-gray-500">
+                  Press Enter to create "{newSubcategory}" as new subcategory
+                </div>
+              )}
+              <div className="p-2 border-t flex justify-between">
+                <button
+                  onClick={() => {
+                    if (newSubcategory.trim()) {
+                      selectSubcategory(newSubcategory.trim());
+                    }
+                  }}
+                  className="bg-green-500 text-white px-3 py-1 rounded text-sm"
+                  disabled={!newSubcategory.trim()}
+                >
+                  Add Subcategory
+                </button>
+                <button
+                  onClick={toggleSubcategoryDropdown}
+                  className="text-gray-500 hover:text-gray-700 text-sm"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+        {availableSubcategories.length === 0 && !showSubcategoryDropdown && (
           <div className="mt-2 p-3 bg-blue-50 rounded text-sm text-blue-700">
-            <p>No subcategories found for selected categories. You can create new ones above.</p>
+            <p>No subcategories found. You can create new ones above.</p>
           </div>
         )}
       </div>
@@ -1328,6 +1313,17 @@ const saveBlog = async (status: "draft" | "publish", date?: string) => {
         />
       )}
 
+      <div className="publish-date-section mt-4 mb-4">
+        <label className="section-label block mb-2 font-semibold">Publish Date</label>
+        <input
+          type="date"
+          value={publishDate}
+          onChange={(e) => setPublishDate(e.target.value)}
+          className="w-full p-2 border rounded"
+          placeholder="Select publish date"
+        />
+      </div>
+
       <div className="editor-actions flex gap-4 mt-4">
         <button
           className="save-button bg-gray-500 text-white px-4 py-2 rounded"
@@ -1342,32 +1338,6 @@ const saveBlog = async (status: "draft" | "publish", date?: string) => {
           Publish
         </button>
       </div>
-
-      {showDateDialog && (
-        <div className="date-dialog mt-4 border rounded p-4 bg-gray-50">
-          <h3 className="mb-4 font-semibold">Select Publish Date</h3>
-          <input
-            type="date"
-            value={publishDate}
-            onChange={(e) => setPublishDate(e.target.value)}
-            className="w-full p-2 border rounded mb-4"
-          />
-          <div className="date-dialog-buttons flex gap-2">
-            <button
-              onClick={confirmPublish}
-              className="bg-blue-500 text-white px-4 py-2 rounded"
-            >
-              Confirm
-            </button>
-            <button
-              onClick={() => setShowDateDialog(false)}
-              className="bg-gray-500 text-white px-4 py-2 rounded"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

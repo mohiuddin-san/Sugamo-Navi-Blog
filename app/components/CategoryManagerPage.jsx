@@ -23,13 +23,17 @@ export default function CategoryManagerPage() {
   const [blogCategories, setBlogCategories] = useState([]);
   const [newBlogCategoryName, setNewBlogCategoryName] = useState("");
   const [editingBlogCategory, setEditingBlogCategory] = useState(null);
-  const [localSubcategories, setLocalSubcategories] = useState([]);
-  const [newSubcategoryName, setNewSubcategoryName] = useState("");
 
-  // Fetch all categories
+  // Subcategories management states
+  const [subcategories, setSubcategories] = useState([]);
+  const [newSubcategoryName, setNewSubcategoryName] = useState("");
+  const [editingSubcategory, setEditingSubcategory] = useState(null);
+
+  // Fetch all categories and subcategories
   useEffect(() => {
     fetchCategories();
     fetchBlogCategories();
+    fetchSubcategories();
   }, []);
 
   const fetchCategories = async () => {
@@ -63,6 +67,24 @@ export default function CategoryManagerPage() {
     } catch (error) {
       console.error('Error fetching blog categories:', error.message);
       alert('Error fetching blog categories: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchSubcategories = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await blogSupabase
+        .from('subcategories')
+        .select('*')
+        .order('name');
+      
+      if (error) throw error;
+      setSubcategories(data || []);
+    } catch (error) {
+      console.error('Error fetching subcategories:', error.message);
+      alert('Error fetching subcategories: ' + error.message);
     } finally {
       setLoading(false);
     }
@@ -159,7 +181,6 @@ export default function CategoryManagerPage() {
     
     setLoading(true);
     try {
-      // Optional: Check if category is used
       const { data: shopCount } = await supabase
         .from('shops')
         .select('id', { count: 'exact' })
@@ -200,8 +221,7 @@ export default function CategoryManagerPage() {
       const { data, error } = await blogSupabase
         .from('categories')
         .insert([{ 
-          name: newBlogCategoryName.trim(),
-          subcategories: [] 
+          name: newBlogCategoryName.trim()
         }])
         .select();
       
@@ -220,8 +240,6 @@ export default function CategoryManagerPage() {
   const handleEditBlogCategory = (category) => {
     setEditingBlogCategory(category);
     setNewBlogCategoryName(category.name);
-    setLocalSubcategories(category.subcategories || []);
-    setNewSubcategoryName("");
   };
 
   const handleUpdateBlogCategory = async () => {
@@ -234,8 +252,7 @@ export default function CategoryManagerPage() {
       const { error } = await blogSupabase
         .from('categories')
         .update({ 
-          name: newBlogCategoryName.trim(), 
-          subcategories: localSubcategories
+          name: newBlogCategoryName.trim()
         })
         .eq('id', editingBlogCategory.id);
       
@@ -244,14 +261,11 @@ export default function CategoryManagerPage() {
       setBlogCategories(blogCategories.map(cat => 
         cat.id === editingBlogCategory.id ? { 
           ...cat, 
-          name: newBlogCategoryName.trim(), 
-          subcategories: localSubcategories
+          name: newBlogCategoryName.trim()
         } : cat
       ));
       setEditingBlogCategory(null);
       setNewBlogCategoryName("");
-      setLocalSubcategories([]);
-      setNewSubcategoryName("");
     } catch (error) {
       console.error('Error updating blog category:', error.message);
       alert('Error updating blog category: ' + error.message);
@@ -281,17 +295,99 @@ export default function CategoryManagerPage() {
     }
   };
 
-  const handleAddSubcategory = () => {
+  // Subcategory handlers
+  const handleAddSubcategory = async () => {
     if (!newSubcategoryName.trim()) {
       alert("Subcategory name cannot be empty");
       return;
     }
-    setLocalSubcategories([...localSubcategories, newSubcategoryName.trim()]);
-    setNewSubcategoryName("");
+    setLoading(true);
+    try {
+      const newSub = {
+        name: newSubcategoryName.trim(),
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+      const { data, error } = await blogSupabase
+        .from('subcategories')
+        .insert([newSub])
+        .select();
+      
+      if (error) throw error;
+      
+      setSubcategories([...subcategories, data[0]]);
+      setNewSubcategoryName("");
+    } catch (error) {
+      console.error('Error adding subcategory:', error.message);
+      alert('Error adding subcategory: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleDeleteSubcategory = (index) => {
-    setLocalSubcategories(localSubcategories.filter((_, i) => i !== index));
+  const handleEditSubcategory = (subcategory) => {
+    setEditingSubcategory(subcategory);
+    setNewSubcategoryName(subcategory.name);
+  };
+
+  const handleUpdateSubcategory = async () => {
+    if (!newSubcategoryName.trim()) {
+      alert("Subcategory name cannot be empty");
+      return;
+    }
+    setLoading(true);
+    try {
+      const { error } = await blogSupabase
+        .from('subcategories')
+        .update({ 
+          name: newSubcategoryName.trim(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', editingSubcategory.id);
+      
+      if (error) throw error;
+      
+      setSubcategories(subcategories.map(sub => 
+        sub.id === editingSubcategory.id ? { 
+          ...sub, 
+          name: newSubcategoryName.trim(),
+          updated_at: new Date().toISOString()
+        } : sub
+      ));
+      setEditingSubcategory(null);
+      setNewSubcategoryName("");
+    } catch (error) {
+      console.error('Error updating subcategory:', error.message);
+      alert('Error updating subcategory: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteSubcategory = async (subcategoryId) => {
+    if (!window.confirm("Are you sure you want to delete this subcategory?")) return;
+    
+    setLoading(true);
+    try {
+      const { error } = await blogSupabase
+        .from('subcategories')
+        .delete()
+        .eq('id', subcategoryId);
+      
+      if (error) throw error;
+      
+      setSubcategories(subcategories.filter(sub => sub.id !== subcategoryId));
+    } catch (error) {
+      console.error('Error deleting subcategory:', error.message);
+      alert('Error deleting subcategory: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCancelEditSub = () => {
+    setEditingSubcategory(null);
+    setNewSubcategoryName("");
   };
 
   return (
@@ -303,7 +399,7 @@ export default function CategoryManagerPage() {
             Category Management
           </h1>
           <p className="text-gray-400 mt-1">
-            Manage categories for tourist places, shops, and blogs
+            Manage categories for tourist places, shops, blogs, and subcategories
           </p>
         </div>
 
@@ -404,7 +500,7 @@ export default function CategoryManagerPage() {
 
         {/* Blog Categories */}
         {!loading && (
-          <div className="bg-gray-800 rounded-2xl shadow-xl p-6">
+          <div className="bg-gray-800 rounded-2xl shadow-xl p-6 mb-8">
             <div className="mb-8">
               <h2 className="text-2xl font-semibold text-gray-100 mb-4">
                 {editingBlogCategory ? "Edit Blog Category" : "Add New Blog Category"}
@@ -429,8 +525,6 @@ export default function CategoryManagerPage() {
                       onClick={() => {
                         setEditingBlogCategory(null);
                         setNewBlogCategoryName("");
-                        setLocalSubcategories([]);
-                        setNewSubcategoryName("");
                       }}
                       className="px-5 py-2.5 bg-gray-600 hover:bg-gray-500 text-white rounded-lg transition-all duration-200"
                     >
@@ -450,53 +544,6 @@ export default function CategoryManagerPage() {
                 )}
               </div>
 
-              {editingBlogCategory && (
-                <div className="mb-6">
-                  <h3 className="text-xl font-semibold text-gray-100 mb-2">Subcategories</h3>
-                  {localSubcategories.length === 0 ? (
-                    <p className="text-gray-400">No subcategories yet.</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {localSubcategories.map((sub, index) => (
-                        <div key={index} className="flex items-center gap-2">
-                          <input
-                            type="text"
-                            value={sub}
-                            onChange={(e) => {
-                              const updated = [...localSubcategories];
-                              updated[index] = e.target.value;
-                              setLocalSubcategories(updated);
-                            }}
-                            className="px-4 py-2 bg-gray-600 border border-gray-500 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 flex-1"
-                          />
-                          <button
-                            onClick={() => handleDeleteSubcategory(index)}
-                            className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors duration-200"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  <div className="flex gap-4 mt-4">
-                    <input
-                      type="text"
-                      value={newSubcategoryName}
-                      onChange={(e) => setNewSubcategoryName(e.target.value)}
-                      placeholder="Enter new subcategory name"
-                      className="px-4 py-3 bg-gray-600 border border-gray-500 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 flex-1"
-                    />
-                    <button
-                      onClick={handleAddSubcategory}
-                      className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-all duration-200"
-                    >
-                      Add Subcategory
-                    </button>
-                  </div>
-                </div>
-              )}
-
               {blogCategories.length === 0 ? (
                 <div className="text-center py-8 bg-gray-700/50 rounded-xl">
                   <p className="text-gray-400 text-lg">No blog categories found. Add a category to start!</p>
@@ -505,7 +552,7 @@ export default function CategoryManagerPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {blogCategories.map(category => (
                     <div key={category.id} className="bg-gray-700 p-4 rounded-lg">
-                      <div className="flex justify-between items-center mb-2">
+                      <div className="flex justify-between items-center">
                         <span className="text-white font-semibold">{category.name}</span>
                         <div className="flex gap-2">
                           <button
@@ -522,8 +569,79 @@ export default function CategoryManagerPage() {
                           </button>
                         </div>
                       </div>
-                      <div className="text-gray-400 text-sm">
-                        Subcategories: {category.subcategories?.length > 0 ? category.subcategories.join(', ') : 'None'}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Blog Subcategories Management */}
+        {!loading && (
+          <div className="bg-gray-800 rounded-2xl shadow-xl p-6">
+            <div className="mb-8">
+              <h2 className="text-2xl font-semibold text-gray-100 mb-4">
+                {editingSubcategory ? "Edit Subcategory" : "Add New Subcategory"}
+              </h2>
+              <div className="flex flex-col md:flex-row gap-4 mb-6">
+                <input
+                  type="text"
+                  value={newSubcategoryName}
+                  onChange={(e) => setNewSubcategoryName(e.target.value)}
+                  placeholder="Enter subcategory name"
+                  className="px-4 py-3 bg-gray-600 border border-gray-500 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 flex-1"
+                />
+                {editingSubcategory ? (
+                  <div className="flex gap-4">
+                    <button
+                      onClick={handleUpdateSubcategory}
+                      className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-all duration-200 flex items-center gap-2"
+                    >
+                      Update Subcategory
+                    </button>
+                    <button
+                      onClick={handleCancelEditSub}
+                      className="px-5 py-2.5 bg-gray-600 hover:bg-gray-500 text-white rounded-lg transition-all duration-200"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={handleAddSubcategory}
+                    className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-all duration-200 flex items-center gap-2"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
+                    </svg>
+                    Add Subcategory
+                  </button>
+                )}
+              </div>
+
+              {subcategories.length === 0 ? (
+                <div className="text-center py-8 bg-gray-700/50 rounded-xl">
+                  <p className="text-gray-400 text-lg">No subcategories found. Add a subcategory to start!</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {subcategories.map(subcategory => (
+                    <div key={subcategory.id} className="bg-gray-700 p-4 rounded-lg flex justify-between items-center">
+                      <span className="text-white">{subcategory.name}</span>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleEditSubcategory(subcategory)}
+                          className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors duration-200"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDeleteSubcategory(subcategory.id)}
+                          className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors duration-200"
+                        >
+                          Delete
+                        </button>
                       </div>
                     </div>
                   ))}
