@@ -1,7 +1,47 @@
 import { useState, useEffect } from "react";
 import supabase from "~/supabase";
 
-export default function BlogList({ onBlogSelect, onNewBlog }) {
+type Language = "en" | "ja";
+
+const blogListTranslations = {
+  en: {
+    yourArticles: "Your Articles",
+    published: "Published",
+    drafts: "Drafts",
+    noPublished: "No published articles",
+    noDrafts: "No draft articles",
+    newArticle: "+ New Article",
+    loading: "Loading blogs...",
+    error: "Error",
+    category: "Category",
+    subcategories: "Subcategories",
+    publishedDate: "Published",
+    uncategorized: "Uncategorized"
+  },
+  ja: {
+    yourArticles: "あなたの記事",
+    published: "公開済み",
+    drafts: "下書き",
+    noPublished: "公開済みの記事がありません",
+    noDrafts: "下書きの記事がありません",
+    newArticle: "+ 新しい記事",
+    loading: "ブログを読み込み中...",
+    error: "エラー",
+    category: "カテゴリー",
+    subcategories: "サブカテゴリー",
+    publishedDate: "公開日",
+    uncategorized: "未分類"
+  }
+};
+
+type BlogListProps = {
+  onBlogSelect: (blogId: string) => void;
+  onNewBlog: () => void;
+  language: Language;
+};
+
+export default function BlogList({ onBlogSelect, onNewBlog, language = "en" }: BlogListProps) {
+  const t = blogListTranslations[language];
   const [blogs, setBlogs] = useState([]);
   const [categories, setCategories] = useState({});
   const [subcategories, setSubcategories] = useState({});
@@ -12,7 +52,6 @@ export default function BlogList({ onBlogSelect, onNewBlog }) {
     const fetchBlogs = async () => {
       try {
         setLoading(true);
-        // Fetch blogs with category_id and subcategory_ids
         const { data: blogData, error: blogError } = await supabase
           .from("blogs")
           .select("id, title, top_image, status, publish_date, category_id, subcategory_ids")
@@ -23,13 +62,11 @@ export default function BlogList({ onBlogSelect, onNewBlog }) {
         console.log("Fetched blogs:", blogData);
         setBlogs(blogData);
 
-        // Get unique category IDs
         const categoryIds = [
           ...new Set(blogData.map(blog => blog.category_id).filter(id => id !== null))
         ];
         console.log("Category IDs to fetch:", categoryIds);
 
-        // Fetch category names
         let catMap = {};
         if (categoryIds.length > 0) {
           const { data: catData, error: catError } = await supabase
@@ -51,7 +88,6 @@ export default function BlogList({ onBlogSelect, onNewBlog }) {
           console.log("No category IDs found");
         }
 
-        // Get unique subcategory IDs
         const subcategoryIds = [
           ...new Set(
             blogData
@@ -61,7 +97,6 @@ export default function BlogList({ onBlogSelect, onNewBlog }) {
         ];
         console.log("Subcategory IDs to fetch:", subcategoryIds);
 
-        // Fetch subcategory names
         let subcatMap = {};
         if (subcategoryIds.length > 0) {
           const { data: subcatData, error: subcatError } = await supabase
@@ -101,10 +136,9 @@ export default function BlogList({ onBlogSelect, onNewBlog }) {
     const status = blog.status?.toLowerCase()?.trim();
     const isPublished = status === "publish";
 
-    // Use "Uncategorized" if no category_id
     const categoryName = blog.category_id && categories[blog.category_id]
       ? categories[blog.category_id]
-      : "Uncategorized";
+      : t.uncategorized;
 
     if (isPublished) {
       if (!acc.publishBlogs[categoryName]) acc.publishBlogs[categoryName] = [];
@@ -117,15 +151,15 @@ export default function BlogList({ onBlogSelect, onNewBlog }) {
     return acc;
   }, { publishBlogs: {}, draftBlogs: {} });
 
-  if (loading) return <div className="loading">Loading blogs...</div>;
-  if (error) return <div className="error">Error: {error}</div>;
+  if (loading) return <div className="loading">{t.loading}</div>;
+  if (error) return <div className="error">{t.error}: {error}</div>;
 
   return (
     <div className="blog-list-container">
-      <h2 className="list-title">Your Articles</h2>
+      <h2 className="list-title">{t.yourArticles}</h2>
 
       <div className="section">
-        <h3 className="section-title text-amber-300">Published</h3>
+        <h3 className="section-title text-amber-300">{t.published}</h3>
         {Object.keys(publishBlogs).length > 0 ? (
           Object.entries(publishBlogs).map(([category, categoryBlogs]) => (
             <div key={`published-${category}`} className="category-section">
@@ -141,17 +175,18 @@ export default function BlogList({ onBlogSelect, onNewBlog }) {
                       : []
                   }
                   onClick={() => handleBlogClick(blog.id)}
+                  language={language}
                 />
               ))}
             </div>
           ))
         ) : (
-          <div className="no-data">No published articles</div>
+          <div className="no-data">{t.noPublished}</div>
         )}
       </div>
 
       <div className="section">
-        <h3 className="section-title text-amber-400">Drafts</h3>
+        <h3 className="section-title text-amber-400">{t.drafts}</h3>
         {Object.keys(draftBlogs).length > 0 ? (
           Object.entries(draftBlogs).map(([category, categoryBlogs]) => (
             <div key={`drafts-${category}`} className="category-section">
@@ -168,23 +203,26 @@ export default function BlogList({ onBlogSelect, onNewBlog }) {
                   }
                   onClick={() => handleBlogClick(blog.id)}
                   isDraft
+                  language={language}
                 />
               ))}
             </div>
           ))
         ) : (
-          <div className="no-data">No draft articles</div>
+          <div className="no-data">{t.noDrafts}</div>
         )}
       </div>
 
       <button className="new-post-button" onClick={onNewBlog}>
-        + New Article
+        {t.newArticle}
       </button>
     </div>
   );
 }
 
-function BlogItem({ blog, onClick, isDraft = false, categoryName, subcategoryNames }) {
+function BlogItem({ blog, onClick, isDraft = false, categoryName, subcategoryNames, language }) {
+  const t = blogListTranslations[language];
+  
   return (
     <div
       className={`blog-item ${isDraft ? 'draft' : ''}`}
@@ -206,15 +244,15 @@ function BlogItem({ blog, onClick, isDraft = false, categoryName, subcategoryNam
       )}
       <div className="blog-info">
         <h4>{blog.title}</h4>
-        <span className="blog-category">Category: {categoryName}</span>
+        <span className="blog-category">{t.category}: {categoryName}</span>
         {subcategoryNames.length > 0 && (
           <span className="blog-subcategories">
-            Subcategories: {subcategoryNames.join(", ")}
+            {t.subcategories}: {subcategoryNames.join(", ")}
           </span>
         )}
         {blog.publish_date && (
           <span className="blog-date">
-            Published: {new Date(blog.publish_date).toLocaleDateString()}
+            {t.publishedDate}: {new Date(blog.publish_date).toLocaleDateString(language === "ja" ? "ja-JP" : "en-US")}
           </span>
         )}
       </div>

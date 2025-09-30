@@ -10,7 +10,93 @@ import supabase from "~/supabase";
 import { FiImage, FiX, FiUpload } from "react-icons/fi";
 import { toString } from 'mdast-util-to-string';
 
-// Simple debounce function
+type Language = "en" | "ja";
+
+const editorTranslations = {
+  en: {
+    blogTitle: "Blog title",
+    featuredImage: "Featured Image",
+    clickToUpload: "Click to upload featured image",
+    recommended: "Recommended: 1200×630px",
+    category: "Category",
+    selectOrType: "Select or type category name",
+    typeToCreate: "Type to create new category",
+    pressEnter: "Press Enter to create",
+    asNewCategory: "as new category",
+    addCategory: "Add Category",
+    close: "Close",
+    subcategories: "Subcategories",
+    selectOrTypeSub: "Select or type subcategory name",
+    typeToCreateSub: "Type to create new subcategory",
+    asNewSubcategory: "as new subcategory",
+    addSubcategory: "Add Subcategory",
+    noSubcategories: "No subcategories found. You can create new ones above.",
+    textColor: "Text Color",
+    applyTextColor: "Apply Text Color",
+    background: "Background",
+    applyBackgroundColor: "Apply Background Color",
+    enterUrlOGP: "Enter URL for OGP card",
+    addOGPCard: "Add OGP Card",
+    addSingleImage: "Add Single Image",
+    addSideBySide: "Add Side-by-Side Images",
+    writeContent: "Write your blog content here (Markdown supported)...",
+    publishDate: "Publish Date",
+    selectPublishDate: "Select publish date",
+    saveDraft: "Save Draft",
+    publish: "Publish",
+    remove: "Remove",
+    pleaseEnterTitle: "Please enter a title",
+    pleaseSelectCategory: "Please select or add a category",
+    pleaseSelectDate: "Please select a publish date",
+    blogSavedSuccess: "Blog saved successfully!",
+    blogUpdatedSuccess: "Blog updated successfully!",
+    failedToSave: "Failed to save blog",
+    failedToUpdate: "Failed to update blog",
+    uncategorized: "Uncategorized"
+  },
+  ja: {
+    blogTitle: "ブログタイトル",
+    featuredImage: "アイキャッチ画像",
+    clickToUpload: "クリックしてアイキャッチ画像をアップロード",
+    recommended: "推奨: 1200×630px",
+    category: "カテゴリー",
+    selectOrType: "カテゴリー名を選択または入力",
+    typeToCreate: "新しいカテゴリーを作成するには入力してください",
+    pressEnter: "Enterキーを押して",
+    asNewCategory: "を新しいカテゴリーとして作成",
+    addCategory: "カテゴリーを追加",
+    close: "閉じる",
+    subcategories: "サブカテゴリー",
+    selectOrTypeSub: "サブカテゴリー名を選択または入力",
+    typeToCreateSub: "新しいサブカテゴリーを作成するには入力してください",
+    asNewSubcategory: "を新しいサブカテゴリーとして作成",
+    addSubcategory: "サブカテゴリーを追加",
+    noSubcategories: "サブカテゴリーが見つかりません。上記で新しいサブカテゴリーを作成できます。",
+    textColor: "テキストカラー",
+    applyTextColor: "テキストカラーを適用",
+    background: "背景",
+    applyBackgroundColor: "背景色を適用",
+    enterUrlOGP: "OGPカードのURLを入力",
+    addOGPCard: "OGPカードを追加",
+    addSingleImage: "画像を追加",
+    addSideBySide: "横並び画像を追加",
+    writeContent: "ブログコンテンツをここに記入してください（Markdown対応）...",
+    publishDate: "公開日",
+    selectPublishDate: "公開日を選択",
+    saveDraft: "下書き保存",
+    publish: "公開",
+    remove: "削除",
+    pleaseEnterTitle: "タイトルを入力してください",
+    pleaseSelectCategory: "カテゴリーを選択または追加してください",
+    pleaseSelectDate: "公開日を選択してください",
+    blogSavedSuccess: "ブログが正常に保存されました！",
+    blogUpdatedSuccess: "ブログが正常に更新されました！",
+    failedToSave: "ブログの保存に失敗しました",
+    failedToUpdate: "ブログの更新に失敗しました",
+    uncategorized: "未分類"
+  }
+};
+
 function debounce<T extends (...args: any[]) => void>(func: T, wait: number): (...args: Parameters<T>) => void {
   let timeout: NodeJS.Timeout | null = null;
   return (...args: Parameters<T>) => {
@@ -34,6 +120,7 @@ type EditorProps = {
   headingToScroll?: string | null;
   onHeadingScrolled?: () => void;
   blogId?: string | null;
+  language: Language;
 };
 
 type Category = {
@@ -53,7 +140,9 @@ export default function Editor({
   headingToScroll,
   onHeadingScrolled,
   blogId: initialBlogId,
+  language = "en"
 }: EditorProps) {
+  const t = editorTranslations[language];
   const [content, setContent] = useState("");
   const [title, setTitle] = useState("");
   const [isPreview, setIsPreview] = useState(false);
@@ -130,70 +219,68 @@ export default function Editor({
     }
   }, [content, title]);
 
-useEffect(() => {
-  if (initialBlogId === null || initialBlogId === "new") {
-    setContent("");
-    setTitle("");
-    setSelectedCategory("");
-    setSelectedSubcategories([]);
-    setTopImage(null);
-    setTopImageFileName(null);
-    setBlogId(null);
-    setPublishDate(""); // Reset publish date for new blog
-  } else if (initialBlogId !== blogId) {
-    const fetchBlog = async () => {
-      const { data, error } = await supabase
-        .from("blogs")
-        .select("id, title, details, top_image, publish_date, category_id, subcategory_ids")
-        .eq("id", initialBlogId)
-        .single();
-      if (error) {
-        console.error("Fetch blog error:", error);
-        alert("Failed to load blog: " + error.message);
-        return;
-      }
-      setTitle(data.title || "");
-      setContent(data.details || "");
-      setTopImage(data.top_image || null);
-      setPublishDate(data.publish_date ? new Date(data.publish_date).toISOString().split("T")[0] : "");
-      setBlogId(initialBlogId);
-
-      // Set category
-      if (data.category_id) {
-        const { data: categoryData, error: categoryError } = await supabase
-          .from("categories")
-          .select("name")
-          .eq("id", data.category_id)
+  useEffect(() => {
+    if (initialBlogId === null || initialBlogId === "new") {
+      setContent("");
+      setTitle("");
+      setSelectedCategory("");
+      setSelectedSubcategories([]);
+      setTopImage(null);
+      setTopImageFileName(null);
+      setBlogId(null);
+      setPublishDate("");
+    } else if (initialBlogId !== blogId) {
+      const fetchBlog = async () => {
+        const { data, error } = await supabase
+          .from("blogs")
+          .select("id, title, details, top_image, publish_date, category_id, subcategory_ids")
+          .eq("id", initialBlogId)
           .single();
-        if (categoryError) {
-          console.error("Fetch category error:", categoryError);
-          alert("Failed to fetch category: " + categoryError.message);
+        if (error) {
+          console.error("Fetch blog error:", error);
+          alert("Failed to load blog: " + error.message);
           return;
         }
-        setSelectedCategory(categoryData.name || "");
-      } else {
-        setSelectedCategory("");
-      }
+        setTitle(data.title || "");
+        setContent(data.details || "");
+        setTopImage(data.top_image || null);
+        setPublishDate(data.publish_date ? new Date(data.publish_date).toISOString().split("T")[0] : "");
+        setBlogId(initialBlogId);
 
-      // Set subcategories
-      if (data.subcategory_ids && data.subcategory_ids.length > 0) {
-        const { data: subcategoriesData, error: subcategoriesError } = await supabase
-          .from("subcategories")
-          .select("name")
-          .in("id", data.subcategory_ids);
-        if (subcategoriesError) {
-          console.error("Fetch subcategories error:", subcategoriesError);
-          alert("Failed to fetch subcategories: " + subcategoriesError.message);
-          return;
+        if (data.category_id) {
+          const { data: categoryData, error: categoryError } = await supabase
+            .from("categories")
+            .select("name")
+            .eq("id", data.category_id)
+            .single();
+          if (categoryError) {
+            console.error("Fetch category error:", categoryError);
+            alert("Failed to fetch category: " + categoryError.message);
+            return;
+          }
+          setSelectedCategory(categoryData.name || "");
+        } else {
+          setSelectedCategory("");
         }
-        setSelectedSubcategories(subcategoriesData.map(sub => sub.name) || []);
-      } else {
-        setSelectedSubcategories([]);
-      }
-    };
-    fetchBlog();
-  }
-}, [initialBlogId, blogId]);
+
+        if (data.subcategory_ids && data.subcategory_ids.length > 0) {
+          const { data: subcategoriesData, error: subcategoriesError } = await supabase
+            .from("subcategories")
+            .select("name")
+            .in("id", data.subcategory_ids);
+          if (subcategoriesError) {
+            console.error("Fetch subcategories error:", subcategoriesError);
+            alert("Failed to fetch subcategories: " + subcategoriesError.message);
+            return;
+          }
+          setSelectedSubcategories(subcategoriesData.map(sub => sub.name) || []);
+        } else {
+          setSelectedSubcategories([]);
+        }
+      };
+      fetchBlog();
+    }
+  }, [initialBlogId, blogId]);
 
   const togglePreview = useCallback(() => {
     const newPreviewState = !isPreview;
@@ -536,34 +623,30 @@ ${imageHtmls.map(html => `<div style="flex: 1;">${html}</div>`).join("\n")}
 
   const saveBlog = async (status: "draft" | "publish", date?: string) => {
     if (!title) {
-      alert("Please enter a title");
+      alert(t.pleaseEnterTitle);
       return;
     }
 
     if (!selectedCategory && !newCategory.trim()) {
-      alert("Please select or add a category");
+      alert(t.pleaseSelectCategory);
       return;
     }
 
     if (status === "publish" && !date) {
-      alert("Please select a publish date");
+      alert(t.pleaseSelectDate);
       return;
     }
 
-    // Check if user is authenticated
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
       alert("You must be logged in to save a blog");
       console.error("Auth error:", authError);
       return;
     }
-    console.log("Authenticated User ID:", user.id);
 
-    // Get or create category
     const categoryName = newCategory.trim() || selectedCategory;
     let categoryId: number | null = null;
     if (categoryName) {
-      console.log("Processing category:", categoryName);
       const { data: existingCategory, error: findError } = await supabase
         .from("categories")
         .select("id")
@@ -578,9 +661,7 @@ ${imageHtmls.map(html => `<div style="flex: 1;">${html}</div>`).join("\n")}
 
       if (existingCategory) {
         categoryId = existingCategory.id;
-        console.log("Existing category ID:", categoryId);
       } else {
-        console.log("Creating new category:", categoryName);
         const { data: newCat, error: insertError } = await supabase
           .from("categories")
           .insert([{ name: categoryName }])
@@ -592,14 +673,12 @@ ${imageHtmls.map(html => `<div style="flex: 1;">${html}</div>`).join("\n")}
           return;
         }
         categoryId = newCat.id;
-        console.log("New category created with ID:", categoryId);
         setCategoriesList([...categoriesList, { id: categoryId, name: categoryName }]);
         setSelectedCategory(categoryName);
         setNewCategory("");
       }
     }
 
-    // Get or create subcategories
     const allSubcategories = [...selectedSubcategories, newSubcategory.trim()].filter(
       (subcat, index, self) => subcat && self.indexOf(subcat) === index
     );
@@ -620,9 +699,7 @@ ${imageHtmls.map(html => `<div style="flex: 1;">${html}</div>`).join("\n")}
 
       if (existingSubcategory) {
         subcategoryIds.push(existingSubcategory.id);
-        console.log("Existing subcategory ID:", existingSubcategory.id);
       } else {
-        console.log("Creating new subcategory:", subcatName);
         const { data: newSubcat, error: insertError } = await supabase
           .from("subcategories")
           .insert([{ name: subcatName, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }])
@@ -634,7 +711,6 @@ ${imageHtmls.map(html => `<div style="flex: 1;">${html}</div>`).join("\n")}
           return;
         }
         subcategoryIds.push(newSubcat.id);
-        console.log("New subcategory created with ID:", newSubcat.id);
         setSubcategoriesList([...subcategoriesList, { id: newSubcat.id, name: subcatName }]);
       }
     }
@@ -650,12 +726,10 @@ ${imageHtmls.map(html => `<div style="flex: 1;">${html}</div>`).join("\n")}
       subcategory_ids: subcategoryIds.length > 0 ? subcategoryIds : null,
       updated_at: new Date().toISOString(),
     };
-    console.log("Saving blog with payload:", blogPayload);
 
     try {
       let currentBlogId = blogId;
       if (blogId) {
-        // Update existing blog
         const { error } = await supabase
           .from("blogs")
           .update(blogPayload)
@@ -663,19 +737,11 @@ ${imageHtmls.map(html => `<div style="flex: 1;">${html}</div>`).join("\n")}
           .eq("user_id", user.id);
         if (error) {
           console.error("Update blog error:", error);
-          if (error.code === "42501") {
-            alert("You don't have permission to update this blog. Ensure you own this blog.");
-          } else if (error.message.includes("No API key found")) {
-            alert("API key is missing. Please check your Supabase configuration.");
-          } else {
-            alert("Failed to update blog: " + error.message);
-          }
+          alert(t.failedToUpdate + ": " + error.message);
           return;
         }
-        console.log("Blog updated successfully, Blog ID:", blogId);
-        alert("Blog updated successfully!");
+        alert(t.blogUpdatedSuccess);
       } else {
-        // Create new blog
         const { data, error } = await supabase
           .from("blogs")
           .insert([blogPayload])
@@ -683,19 +749,12 @@ ${imageHtmls.map(html => `<div style="flex: 1;">${html}</div>`).join("\n")}
           .single();
         if (error) {
           console.error("Insert blog error:", error);
-          if (error.message.includes("No API key found")) {
-            alert("API key is missing. Please check your Supabase configuration.");
-          } else if (error.code === "42501") {
-            alert("You don't have permission to create a blog.");
-          } else {
-            alert("Failed to save blog: " + error.message);
-          }
+          alert(t.failedToSave + ": " + error.message);
           return;
         }
         currentBlogId = data.id;
-        console.log("New Blog ID:", currentBlogId);
         setBlogId(currentBlogId);
-        alert("Blog saved successfully!");
+        alert(t.blogSavedSuccess);
       }
 
       setSelectedSubcategories(allSubcategories.slice(0, -1));
@@ -712,7 +771,7 @@ ${imageHtmls.map(html => `<div style="flex: 1;">${html}</div>`).join("\n")}
 
   const handlePublish = () => {
     if (!publishDate) {
-      alert("Please select a publish date");
+      alert(t.pleaseSelectDate);
       return;
     }
     saveBlog("publish", new Date(publishDate).toISOString());
@@ -807,7 +866,7 @@ ${imageHtmls.map(html => `<div style="flex: 1;">${html}</div>`).join("\n")}
             zIndex: 10,
           }}
         >
-          Remove
+          {t.remove}
         </button>
         <img
           src={baseUrl}
@@ -978,7 +1037,7 @@ ${imageHtmls.map(html => `<div style="flex: 1;">${html}</div>`).join("\n")}
             className="close-button absolute top-4 right-4 bg-gray-500 text-white px-4 py-2 rounded"
             onClick={() => setFullscreenImage(null)}
           >
-            Close
+            {t.close}
           </button>
         </div>
       )}
@@ -987,12 +1046,12 @@ ${imageHtmls.map(html => `<div style="flex: 1;">${html}</div>`).join("\n")}
         type="text"
         value={title}
         onChange={(e) => setTitle(e.target.value)}
-        placeholder="Blog title"
+        placeholder={t.blogTitle}
         className="editor-title w-full p-2 mb-4 border rounded"
       />
 
       <div className="top-image-section mb-4">
-        <label className="section-label block mb-2 font-semibold">Featured Image</label>
+        <label className="section-label block mb-2 font-semibold">{t.featuredImage}</label>
         <div
           className={`top-image-upload ${!topImage ? "empty" : ""} border rounded p-4 flex justify-center items-center cursor-pointer relative`}
           onClick={() => topImageInputRef.current?.click()}
@@ -1017,8 +1076,8 @@ ${imageHtmls.map(html => `<div style="flex: 1;">${html}</div>`).join("\n")}
           ) : (
             <div className="upload-placeholder text-center">
               <FiUpload size={24} className="mx-auto" />
-              <span className="block">Click to upload featured image</span>
-              <span className="block text-sm text-gray-500">Recommended: 1200×630px</span>
+              <span className="block">{t.clickToUpload}</span>
+              <span className="block text-sm text-gray-500">{t.recommended}</span>
             </div>
           )}
           <input
@@ -1032,7 +1091,7 @@ ${imageHtmls.map(html => `<div style="flex: 1;">${html}</div>`).join("\n")}
       </div>
 
       <div className="category-section mb-4">
-        <label className="section-label block mb-2 font-semibold">Category</label>
+        <label className="section-label block mb-2 font-semibold">{t.category}</label>
         <div className="selected-items flex flex-wrap gap-2 mb-4">
           {selectedCategory && (
             <span
@@ -1055,7 +1114,7 @@ ${imageHtmls.map(html => `<div style="flex: 1;">${html}</div>`).join("\n")}
             value={newCategory}
             onChange={handleCategoryInputChange}
             onFocus={toggleCategoryDropdown}
-            placeholder="Select or type category name"
+            placeholder={t.selectOrType}
             className="w-full p-2 border rounded"
             onKeyDown={handleCategoryKeyDown}
             disabled={!!selectedCategory}
@@ -1067,7 +1126,7 @@ ${imageHtmls.map(html => `<div style="flex: 1;">${html}</div>`).join("\n")}
                   type="text"
                   value={newCategory}
                   onChange={handleCategoryInputChange}
-                  placeholder="Type to create new category"
+                  placeholder={t.typeToCreate}
                   className="w-full p-2 border rounded"
                   onKeyDown={handleCategoryKeyDown}
                 />
@@ -1087,7 +1146,7 @@ ${imageHtmls.map(html => `<div style="flex: 1;">${html}</div>`).join("\n")}
               )}
               {availableCategories.length === 0 && newCategory.trim() && (
                 <div className="p-3 text-center text-gray-500">
-                  Press Enter to create "{newCategory}" as new category
+                  {t.pressEnter} "{newCategory}" {t.asNewCategory}
                 </div>
               )}
               <div className="p-2 border-t flex justify-between">
@@ -1100,13 +1159,13 @@ ${imageHtmls.map(html => `<div style="flex: 1;">${html}</div>`).join("\n")}
                   className="bg-blue-500 text-white px-3 py-1 rounded text-sm"
                   disabled={!newCategory.trim()}
                 >
-                  Add Category
+                  {t.addCategory}
                 </button>
                 <button
                   onClick={toggleCategoryDropdown}
                   className="text-gray-500 hover:text-gray-700 text-sm"
                 >
-                  Close
+                  {t.close}
                 </button>
               </div>
             </div>
@@ -1115,7 +1174,7 @@ ${imageHtmls.map(html => `<div style="flex: 1;">${html}</div>`).join("\n")}
       </div>
 
       <div className="subcategory-section mb-4">
-        <label className="section-label block mb-2 font-semibold">Subcategories</label>
+        <label className="section-label block mb-2 font-semibold">{t.subcategories}</label>
         <div className="selected-items flex flex-wrap gap-2 mb-4">
           {selectedSubcategories.map((subcat, index) => (
             <span
@@ -1139,7 +1198,7 @@ ${imageHtmls.map(html => `<div style="flex: 1;">${html}</div>`).join("\n")}
             value={newSubcategory}
             onChange={handleSubcategoryInputChange}
             onFocus={toggleSubcategoryDropdown}
-            placeholder="Select or type subcategory name"
+            placeholder={t.selectOrTypeSub}
             className="w-full p-2 border rounded"
             onKeyDown={handleSubcategoryKeyDown}
           />
@@ -1150,7 +1209,7 @@ ${imageHtmls.map(html => `<div style="flex: 1;">${html}</div>`).join("\n")}
                   type="text"
                   value={newSubcategory}
                   onChange={handleSubcategoryInputChange}
-                  placeholder="Type to create new subcategory"
+                  placeholder={t.typeToCreateSub}
                   className="w-full p-2 border rounded"
                   onKeyDown={handleSubcategoryKeyDown}
                 />
@@ -1170,7 +1229,7 @@ ${imageHtmls.map(html => `<div style="flex: 1;">${html}</div>`).join("\n")}
               )}
               {availableSubcategories.length === 0 && newSubcategory.trim() && (
                 <div className="p-3 text-center text-gray-500">
-                  Press Enter to create "{newSubcategory}" as new subcategory
+                  {t.pressEnter} "{newSubcategory}" {t.asNewSubcategory}
                 </div>
               )}
               <div className="p-2 border-t flex justify-between">
@@ -1183,13 +1242,13 @@ ${imageHtmls.map(html => `<div style="flex: 1;">${html}</div>`).join("\n")}
                   className="bg-green-500 text-white px-3 py-1 rounded text-sm"
                   disabled={!newSubcategory.trim()}
                 >
-                  Add Subcategory
+                  {t.addSubcategory}
                 </button>
                 <button
                   onClick={toggleSubcategoryDropdown}
                   className="text-gray-500 hover:text-gray-700 text-sm"
                 >
-                  Close
+                  {t.close}
                 </button>
               </div>
             </div>
@@ -1197,7 +1256,7 @@ ${imageHtmls.map(html => `<div style="flex: 1;">${html}</div>`).join("\n")}
         </div>
         {availableSubcategories.length === 0 && !showSubcategoryDropdown && (
           <div className="mt-2 p-3 bg-blue-50 rounded text-sm text-blue-700">
-            <p>No subcategories found. You can create new ones above.</p>
+            <p>{t.noSubcategories}</p>
           </div>
         )}
       </div>
@@ -1214,7 +1273,7 @@ ${imageHtmls.map(html => `<div style="flex: 1;">${html}</div>`).join("\n")}
       <div className="editor-toolbar flex gap-4 mb-4">
         <div className="color-picker flex items-center gap-2">
           <label className="flex items-center gap-1">
-            Text Color
+            {t.textColor}
             <input
               type="color"
               value={activeColor}
@@ -1225,10 +1284,10 @@ ${imageHtmls.map(html => `<div style="flex: 1;">${html}</div>`).join("\n")}
             onClick={() => debouncedApplyColorStyle(activeColor, false)}
             className="apply-color-button bg-blue-500 text-white px-2 py-1 rounded"
           >
-            Apply Text Color
+            {t.applyTextColor}
           </button>
           <label className="flex items-center gap-1">
-            Background
+            {t.background}
             <input
               type="color"
               value={activeBgColor}
@@ -1239,7 +1298,7 @@ ${imageHtmls.map(html => `<div style="flex: 1;">${html}</div>`).join("\n")}
             onClick={() => debouncedApplyColorStyle(activeBgColor, true)}
             className="apply-color-button bg-blue-500 text-white px-2 py-1 rounded"
           >
-            Apply Background Color
+            {t.applyBackgroundColor}
           </button>
         </div>
 
@@ -1249,7 +1308,7 @@ ${imageHtmls.map(html => `<div style="flex: 1;">${html}</div>`).join("\n")}
             value={urlForOGP}
             onChange={(e) => setUrlForOGP(e.target.value)}
             onPaste={handleOGPPaste}
-            placeholder="Enter URL for OGP card"
+            placeholder={t.enterUrlOGP}
             className="p-2 border rounded"
             onKeyDown={(e) => e.key === "Enter" && handleOGPCardInsert(urlForOGP)}
           />
@@ -1257,7 +1316,7 @@ ${imageHtmls.map(html => `<div style="flex: 1;">${html}</div>`).join("\n")}
             onClick={() => handleOGPCardInsert(urlForOGP)}
             className="bg-blue-500 text-white px-2 py-1 rounded"
           >
-            Add OGP Card
+            {t.addOGPCard}
           </button>
         </div>
       </div>
@@ -1267,13 +1326,13 @@ ${imageHtmls.map(html => `<div style="flex: 1;">${html}</div>`).join("\n")}
           className="toolbar-button bg-blue-500 text-black px-2 py-1 rounded mr-2"
           onClick={() => triggerImageUpload("single")}
         >
-          Add Single Image
+          {t.addSingleImage}
         </button>
         <button
           className="toolbar-button bg-blue-500 text-black px-2 py-1 rounded"
           onClick={() => triggerImageUpload("side-by-side")}
         >
-          Add Side-by-Side Images
+          {t.addSideBySide}
         </button>
         <input
           type="file"
@@ -1309,18 +1368,18 @@ ${imageHtmls.map(html => `<div style="flex: 1;">${html}</div>`).join("\n")}
           value={content}
           onChange={(e) => setContent(e.target.value)}
           className="editor-content w-full h-96 p-2 border rounded mb-4"
-          placeholder="Write your blog content here (Markdown supported)..."
+          placeholder={t.writeContent}
         />
       )}
 
       <div className="publish-date-section mt-4 mb-4">
-        <label className="section-label block mb-2 font-semibold">Publish Date</label>
+        <label className="section-label block mb-2 font-semibold">{t.publishDate}</label>
         <input
           type="date"
           value={publishDate}
           onChange={(e) => setPublishDate(e.target.value)}
           className="w-full p-2 border rounded"
-          placeholder="Select publish date"
+          placeholder={t.selectPublishDate}
         />
       </div>
 
@@ -1329,13 +1388,13 @@ ${imageHtmls.map(html => `<div style="flex: 1;">${html}</div>`).join("\n")}
           className="save-button bg-gray-500 text-white px-4 py-2 rounded"
           onClick={handleSaveDraft}
         >
-          Save Draft
+          {t.saveDraft}
         </button>
         <button
           className="publish-button bg-green-500 text-white px-4 py-2 rounded"
           onClick={handlePublish}
         >
-          Publish
+          {t.publish}
         </button>
       </div>
     </div>

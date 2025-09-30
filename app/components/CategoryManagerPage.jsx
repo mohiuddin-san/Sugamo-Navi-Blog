@@ -3,7 +3,81 @@ import { createClient } from '@supabase/supabase-js';
 import { v4 as uuidv4 } from 'uuid';
 import blogSupabase from "~/supabase";
 
-// Initialize Supabase client
+const categoryTranslations = {
+  en: {
+    categoryManagement: "Category Management",
+    manageCategoriesDesc: "Manage categories for tourist places, shops, blogs, and subcategories",
+    editShopCategory: "Edit Shop/Tourist Category",
+    addNewShopCategory: "Add New Shop/Tourist Category",
+    enterCategoryName: "Enter category name",
+    both: "Both",
+    shop: "Shop",
+    touristPlace: "Tourist Place",
+    updateCategory: "Update Category",
+    cancel: "Cancel",
+    addCategory: "Add Category",
+    noCategoriesFound: "No shop/tourist categories found. Add a category to start!",
+    edit: "Edit",
+    delete: "Delete",
+    editBlogCategory: "Edit Blog Category",
+    addNewBlogCategory: "Add New Blog Category",
+    enterBlogCategoryName: "Enter blog category name",
+    updateBlogCategory: "Update Blog Category",
+    addBlogCategory: "Add Blog Category",
+    noBlogCategoriesFound: "No blog categories found. Add a category to start!",
+    editSubcategory: "Edit Subcategory",
+    addNewSubcategory: "Add New Subcategory",
+    enterSubcategoryName: "Enter subcategory name",
+    updateSubcategory: "Update Subcategory",
+    addSubcategory: "Add Subcategory",
+    noSubcategoriesFound: "No subcategories found. Add a subcategory to start!",
+    categoryNameEmpty: "Category name cannot be empty",
+    categoryTypeEmpty: "Category type cannot be empty",
+    deleteConfirm: "Are you sure you want to delete this category? Ensure no places or shops are using it.",
+    cannotDelete: "Cannot delete category: It is used by shops or places.",
+    blogCategoryDeleteConfirm: "Are you sure you want to delete this blog category?",
+    subcategoryDeleteConfirm: "Are you sure you want to delete this subcategory?",
+    subcategoryNameEmpty: "Subcategory name cannot be empty",
+    loading: "Loading..."
+  },
+  ja: {
+    categoryManagement: "カテゴリー管理",
+    manageCategoriesDesc: "観光地、ショップ、ブログ、サブカテゴリーのカテゴリーを管理",
+    editShopCategory: "ショップ/観光カテゴリーを編集",
+    addNewShopCategory: "新しいショップ/観光カテゴリーを追加",
+    enterCategoryName: "カテゴリー名を入力",
+    both: "両方",
+    shop: "ショップ",
+    touristPlace: "観光地",
+    updateCategory: "カテゴリーを更新",
+    cancel: "キャンセル",
+    addCategory: "カテゴリーを追加",
+    noCategoriesFound: "ショップ/観光カテゴリーが見つかりません。カテゴリーを追加して開始してください！",
+    edit: "編集",
+    delete: "削除",
+    editBlogCategory: "ブログカテゴリーを編集",
+    addNewBlogCategory: "新しいブログカテゴリーを追加",
+    enterBlogCategoryName: "ブログカテゴリー名を入力",
+    updateBlogCategory: "ブログカテゴリーを更新",
+    addBlogCategory: "ブログカテゴリーを追加",
+    noBlogCategoriesFound: "ブログカテゴリーが見つかりません。カテゴリーを追加して開始してください！",
+    editSubcategory: "サブカテゴリーを編集",
+    addNewSubcategory: "新しいサブカテゴリーを追加",
+    enterSubcategoryName: "サブカテゴリー名を入力",
+    updateSubcategory: "サブカテゴリーを更新",
+    addSubcategory: "サブカテゴリーを追加",
+    noSubcategoriesFound: "サブカテゴリーが見つかりません。サブカテゴリーを追加して開始してください！",
+    categoryNameEmpty: "カテゴリー名を空にすることはできません",
+    categoryTypeEmpty: "カテゴリータイプを空にすることはできません",
+    deleteConfirm: "このカテゴリーを削除してもよろしいですか？場所やショップで使用されていないことを確認してください。",
+    cannotDelete: "カテゴリーを削除できません：ショップまたは場所で使用されています。",
+    blogCategoryDeleteConfirm: "このブログカテゴリーを削除してもよろしいですか？",
+    subcategoryDeleteConfirm: "このサブカテゴリーを削除してもよろしいですか？",
+    subcategoryNameEmpty: "サブカテゴリー名を空にすることはできません",
+    loading: "読み込み中..."
+  }
+};
+
 const supabaseUrl = import.meta.env.VITE_TOURIST_SUPABASE_URL || import.meta.env.VITE_SHOP_SUPABASE_URL;
 const supabaseKey = import.meta.env.VITE_TOURIST_SUPABASE_ANON_KEY || import.meta.env.VITE_SHOP_SUPABASE_ANON_KEY;
 
@@ -13,10 +87,14 @@ if (!supabaseUrl || !supabaseKey) {
 
 const supabase = createClient(supabaseUrl || '', supabaseKey || '');
 
-export default function CategoryManagerPage() {
+/**
+ * @param {{ language?: "en" | "ja" }} props
+ */
+export default function CategoryManagerPage({ language = "en" }) {
+  const t = categoryTranslations[language];
   const [categories, setCategories] = useState([]);
   const [newCategoryName, setNewCategoryName] = useState("");
-  const [newCategoryType, setNewCategoryType] = useState("both"); // Default to "both"
+  const [newCategoryType, setNewCategoryType] = useState("both");
   const [editingCategory, setEditingCategory] = useState(null);
   const [loading, setLoading] = useState(false);
 
@@ -24,12 +102,10 @@ export default function CategoryManagerPage() {
   const [newBlogCategoryName, setNewBlogCategoryName] = useState("");
   const [editingBlogCategory, setEditingBlogCategory] = useState(null);
 
-  // Subcategories management states
   const [subcategories, setSubcategories] = useState([]);
   const [newSubcategoryName, setNewSubcategoryName] = useState("");
   const [editingSubcategory, setEditingSubcategory] = useState(null);
 
-  // Fetch all categories and subcategories
   useEffect(() => {
     fetchCategories();
     fetchBlogCategories();
@@ -90,14 +166,13 @@ export default function CategoryManagerPage() {
     }
   };
 
-  // Handle adding new category
   const handleAddCategory = async () => {
     if (!newCategoryName.trim()) {
-      alert("Category name cannot be empty");
+      alert(t.categoryNameEmpty);
       return;
     }
     if (!newCategoryType) {
-      alert("Category type cannot be empty");
+      alert(t.categoryTypeEmpty);
       return;
     }
     setLoading(true);
@@ -126,21 +201,19 @@ export default function CategoryManagerPage() {
     }
   };
 
-  // Handle editing category
   const handleEditCategory = (category) => {
     setEditingCategory(category);
     setNewCategoryName(category.name);
     setNewCategoryType(category.type);
   };
 
-  // Handle updating category
   const handleUpdateCategory = async () => {
     if (!newCategoryName.trim()) {
-      alert("Category name cannot be empty");
+      alert(t.categoryNameEmpty);
       return;
     }
     if (!newCategoryType) {
-      alert("Category type cannot be empty");
+      alert(t.categoryTypeEmpty);
       return;
     }
     setLoading(true);
@@ -175,9 +248,8 @@ export default function CategoryManagerPage() {
     }
   };
 
-  // Handle deleting category
   const handleDeleteCategory = async (categoryId) => {
-    if (!window.confirm("Are you sure you want to delete this category? Ensure no places or shops are using it.")) return;
+    if (!window.confirm(t.deleteConfirm)) return;
     
     setLoading(true);
     try {
@@ -190,7 +262,7 @@ export default function CategoryManagerPage() {
         .select('id', { count: 'exact' })
         .eq('category_id', categoryId);
       if (shopCount.length > 0 || placeCount.length > 0) {
-        alert('Cannot delete category: It is used by shops or places.');
+        alert(t.cannotDelete);
         return;
       }
 
@@ -210,10 +282,9 @@ export default function CategoryManagerPage() {
     }
   };
 
-  // Blog category handlers
   const handleAddBlogCategory = async () => {
     if (!newBlogCategoryName.trim()) {
-      alert("Blog category name cannot be empty");
+      alert(t.categoryNameEmpty);
       return;
     }
     setLoading(true);
@@ -244,7 +315,7 @@ export default function CategoryManagerPage() {
 
   const handleUpdateBlogCategory = async () => {
     if (!newBlogCategoryName.trim()) {
-      alert("Blog category name cannot be empty");
+      alert(t.categoryNameEmpty);
       return;
     }
     setLoading(true);
@@ -275,7 +346,7 @@ export default function CategoryManagerPage() {
   };
 
   const handleDeleteBlogCategory = async (categoryId) => {
-    if (!window.confirm("Are you sure you want to delete this blog category?")) return;
+    if (!window.confirm(t.blogCategoryDeleteConfirm)) return;
     
     setLoading(true);
     try {
@@ -295,10 +366,9 @@ export default function CategoryManagerPage() {
     }
   };
 
-  // Subcategory handlers
   const handleAddSubcategory = async () => {
     if (!newSubcategoryName.trim()) {
-      alert("Subcategory name cannot be empty");
+      alert(t.subcategoryNameEmpty);
       return;
     }
     setLoading(true);
@@ -332,7 +402,7 @@ export default function CategoryManagerPage() {
 
   const handleUpdateSubcategory = async () => {
     if (!newSubcategoryName.trim()) {
-      alert("Subcategory name cannot be empty");
+      alert(t.subcategoryNameEmpty);
       return;
     }
     setLoading(true);
@@ -365,7 +435,7 @@ export default function CategoryManagerPage() {
   };
 
   const handleDeleteSubcategory = async (subcategoryId) => {
-    if (!window.confirm("Are you sure you want to delete this subcategory?")) return;
+    if (!window.confirm(t.subcategoryDeleteConfirm)) return;
     
     setLoading(true);
     try {
@@ -393,13 +463,12 @@ export default function CategoryManagerPage() {
   return (
     <div className="bg-gray-900 text-gray-100 p-6">
       <div className="max-w-7xl mx-auto">
-        {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold bg-gradient-to-r from-indigo-400 to-purple-500 bg-clip-text text-transparent">
-            Category Management
+            {t.categoryManagement}
           </h1>
           <p className="text-gray-400 mt-1">
-            Manage categories for tourist places, shops, blogs, and subcategories
+            {t.manageCategoriesDesc}
           </p>
         </div>
 
@@ -409,19 +478,18 @@ export default function CategoryManagerPage() {
           </div>
         )}
 
-        {/* Shop/Tourist Categories */}
         {!loading && (
           <div className="bg-gray-800 rounded-2xl shadow-xl p-6 mb-8">
             <div className="mb-8">
               <h2 className="text-2xl font-semibold text-gray-100 mb-4">
-                {editingCategory ? "Edit Shop/Tourist Category" : "Add New Shop/Tourist Category"}
+                {editingCategory ? t.editShopCategory : t.addNewShopCategory}
               </h2>
               <div className="flex flex-col md:flex-row gap-4 mb-6">
                 <input
                   type="text"
                   value={newCategoryName}
                   onChange={(e) => setNewCategoryName(e.target.value)}
-                  placeholder="Enter category name"
+                  placeholder={t.enterCategoryName}
                   className="px-4 py-3 bg-gray-600 border border-gray-500 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
                 <select
@@ -429,9 +497,9 @@ export default function CategoryManagerPage() {
                   onChange={(e) => setNewCategoryType(e.target.value)}
                   className="px-4 py-3 bg-gray-600 border border-gray-500 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 >
-                  <option value="both">Both</option>
-                  <option value="shop">Shop</option>
-                  <option value="place">Tourist Place</option>
+                  <option value="both">{t.both}</option>
+                  <option value="shop">{t.shop}</option>
+                  <option value="place">{t.touristPlace}</option>
                 </select>
                 {editingCategory ? (
                   <div className="flex gap-4">
@@ -439,7 +507,7 @@ export default function CategoryManagerPage() {
                       onClick={handleUpdateCategory}
                       className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-all duration-200 flex items-center gap-2"
                     >
-                      Update Category
+                      {t.updateCategory}
                     </button>
                     <button
                       onClick={() => {
@@ -449,7 +517,7 @@ export default function CategoryManagerPage() {
                       }}
                       className="px-5 py-2.5 bg-gray-600 hover:bg-gray-500 text-white rounded-lg transition-all duration-200"
                     >
-                      Cancel
+                      {t.cancel}
                     </button>
                   </div>
                 ) : (
@@ -460,13 +528,13 @@ export default function CategoryManagerPage() {
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                       <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
                     </svg>
-                    Add Category
+                    {t.addCategory}
                   </button>
                 )}
               </div>
               {categories.length === 0 ? (
                 <div className="text-center py-8 bg-gray-700/50 rounded-xl">
-                  <p className="text-gray-400 text-lg">No shop/tourist categories found. Add a category to start!</p>
+                  <p className="text-gray-400 text-lg">{t.noCategoriesFound}</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -474,20 +542,20 @@ export default function CategoryManagerPage() {
                     <div key={category.id} className="bg-gray-700 p-4 rounded-lg flex justify-between items-center">
                       <div>
                         <span className="text-white">{category.name}</span>
-                        <span className="text-gray-400 text-sm ml-2">({category.type})</span>
+                        <span className="text-gray-400 text-sm ml-2">({language === "ja" ? (category.type === "both" ? "両方" : category.type === "shop" ? "ショップ" : "観光地") : category.type})</span>
                       </div>
                       <div className="flex gap-2">
                         <button
                           onClick={() => handleEditCategory(category)}
                           className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors duration-200"
                         >
-                          Edit
+                          {t.edit}
                         </button>
                         <button
                           onClick={() => handleDeleteCategory(category.id)}
                           className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors duration-200"
                         >
-                          Delete
+                          {t.delete}
                         </button>
                       </div>
                     </div>
@@ -498,19 +566,18 @@ export default function CategoryManagerPage() {
           </div>
         )}
 
-        {/* Blog Categories */}
         {!loading && (
           <div className="bg-gray-800 rounded-2xl shadow-xl p-6 mb-8">
             <div className="mb-8">
               <h2 className="text-2xl font-semibold text-gray-100 mb-4">
-                {editingBlogCategory ? "Edit Blog Category" : "Add New Blog Category"}
+                {editingBlogCategory ? t.editBlogCategory : t.addNewBlogCategory}
               </h2>
               <div className="flex flex-col md:flex-row gap-4 mb-6">
                 <input
                   type="text"
                   value={newBlogCategoryName}
                   onChange={(e) => setNewBlogCategoryName(e.target.value)}
-                  placeholder="Enter blog category name"
+                  placeholder={t.enterBlogCategoryName}
                   className="px-4 py-3 bg-gray-600 border border-gray-500 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
                 {editingBlogCategory ? (
@@ -519,7 +586,7 @@ export default function CategoryManagerPage() {
                       onClick={handleUpdateBlogCategory}
                       className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-all duration-200 flex items-center gap-2"
                     >
-                      Update Blog Category
+                      {t.updateBlogCategory}
                     </button>
                     <button
                       onClick={() => {
@@ -528,7 +595,7 @@ export default function CategoryManagerPage() {
                       }}
                       className="px-5 py-2.5 bg-gray-600 hover:bg-gray-500 text-white rounded-lg transition-all duration-200"
                     >
-                      Cancel
+                      {t.cancel}
                     </button>
                   </div>
                 ) : (
@@ -539,14 +606,14 @@ export default function CategoryManagerPage() {
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                       <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
                     </svg>
-                    Add Blog Category
+                    {t.addBlogCategory}
                   </button>
                 )}
               </div>
 
               {blogCategories.length === 0 ? (
                 <div className="text-center py-8 bg-gray-700/50 rounded-xl">
-                  <p className="text-gray-400 text-lg">No blog categories found. Add a category to start!</p>
+                  <p className="text-gray-400 text-lg">{t.noBlogCategoriesFound}</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -559,13 +626,13 @@ export default function CategoryManagerPage() {
                             onClick={() => handleEditBlogCategory(category)}
                             className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors duration-200"
                           >
-                            Edit
+                            {t.edit}
                           </button>
                           <button
                             onClick={() => handleDeleteBlogCategory(category.id)}
                             className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors duration-200"
                           >
-                            Delete
+                            {t.delete}
                           </button>
                         </div>
                       </div>
@@ -577,19 +644,18 @@ export default function CategoryManagerPage() {
           </div>
         )}
 
-        {/* Blog Subcategories Management */}
         {!loading && (
           <div className="bg-gray-800 rounded-2xl shadow-xl p-6">
             <div className="mb-8">
               <h2 className="text-2xl font-semibold text-gray-100 mb-4">
-                {editingSubcategory ? "Edit Subcategory" : "Add New Subcategory"}
+                {editingSubcategory ? t.editSubcategory : t.addNewSubcategory}
               </h2>
               <div className="flex flex-col md:flex-row gap-4 mb-6">
                 <input
                   type="text"
                   value={newSubcategoryName}
                   onChange={(e) => setNewSubcategoryName(e.target.value)}
-                  placeholder="Enter subcategory name"
+                  placeholder={t.enterSubcategoryName}
                   className="px-4 py-3 bg-gray-600 border border-gray-500 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 flex-1"
                 />
                 {editingSubcategory ? (
@@ -598,13 +664,13 @@ export default function CategoryManagerPage() {
                       onClick={handleUpdateSubcategory}
                       className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-all duration-200 flex items-center gap-2"
                     >
-                      Update Subcategory
+                      {t.updateSubcategory}
                     </button>
                     <button
                       onClick={handleCancelEditSub}
                       className="px-5 py-2.5 bg-gray-600 hover:bg-gray-500 text-white rounded-lg transition-all duration-200"
                     >
-                      Cancel
+                      {t.cancel}
                     </button>
                   </div>
                 ) : (
@@ -615,14 +681,14 @@ export default function CategoryManagerPage() {
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                       <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
                     </svg>
-                    Add Subcategory
+                    {t.addSubcategory}
                   </button>
                 )}
               </div>
 
               {subcategories.length === 0 ? (
                 <div className="text-center py-8 bg-gray-700/50 rounded-xl">
-                  <p className="text-gray-400 text-lg">No subcategories found. Add a subcategory to start!</p>
+                  <p className="text-gray-400 text-lg">{t.noSubcategoriesFound}</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -634,13 +700,13 @@ export default function CategoryManagerPage() {
                           onClick={() => handleEditSubcategory(subcategory)}
                           className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors duration-200"
                         >
-                          Edit
+                          {t.edit}
                         </button>
                         <button
                           onClick={() => handleDeleteSubcategory(subcategory.id)}
                           className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors duration-200"
                         >
-                          Delete
+                          {t.delete}
                         </button>
                       </div>
                     </div>

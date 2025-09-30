@@ -5,7 +5,7 @@ import Bloglist from "~/components/BlogList";
 import Editor from "~/components/Editor";
 import ShopManagerPage from "~/components/ShopManagerPage";
 import SeeAndDoManagerPage from "~/components/SeeAndDoManagerPage";
-import CategoryManagerPage from "~/components/CategoryManagerPage"; // New component
+import CategoryManagerPage from "~/components/CategoryManagerPage"; 
 import supabase from '~/supabase';
 
 type Heading = {
@@ -15,13 +15,49 @@ type Heading = {
 };
 
 type AppView = "blog-editor" | "shop-manager" | "see-and-do" | "categories";
+type Language = "en" | "ja";
 
-function LoginPage() {
+// Translation object
+const translations = {
+  en: {
+    adminPanel: "Admin Panel",
+    signIn: "Sign in",
+    signingIn: "Signing in...",
+    adminPanelLogin: "Admin Panel Login",
+    signInToAccess: "Sign in to access the admin dashboard",
+    emailAddress: "Email address",
+    password: "Password",
+    blogEditor: "Blog Editor",
+    shopManager: "Shop Manager",
+    seeAndDo: "See and Do",
+    categories: "Categories",
+    logout: "Logout",
+    language: "Language"
+  },
+  ja: {
+    adminPanel: "管理パネル",
+    signIn: "サインイン",
+    signingIn: "サインイン中...",
+    adminPanelLogin: "管理パネルログイン",
+    signInToAccess: "管理ダッシュボードにアクセスするにはサインインしてください",
+    emailAddress: "メールアドレス",
+    password: "パスワード",
+    blogEditor: "ブログエディター",
+    shopManager: "ショップマネージャー",
+    seeAndDo: "観光情報",
+    categories: "カテゴリー",
+    logout: "ログアウト",
+    language: "言語"
+  }
+};
+
+function LoginPage({ language }: { language: Language }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
+  const t = translations[language];
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,10 +87,10 @@ function LoginPage() {
       <div className="max-w-md w-full space-y-8">
         <div>
           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Admin Panel Login
+            {t.adminPanelLogin}
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
-            Sign in to access the admin dashboard
+            {t.signInToAccess}
           </p>
         </div>
         <form className="mt-8 space-y-6" onSubmit={handleLogin}>
@@ -66,7 +102,7 @@ function LoginPage() {
           <div className="rounded-md shadow-sm -space-y-px">
             <div>
               <label htmlFor="email-address" className="sr-only">
-                Email address
+                {t.emailAddress}
               </label>
               <input
                 id="email-address"
@@ -75,14 +111,14 @@ function LoginPage() {
                 autoComplete="email"
                 required
                 className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                placeholder="Email address"
+                placeholder={t.emailAddress}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
               />
             </div>
             <div>
               <label htmlFor="password" className="sr-only">
-                Password
+                {t.password}
               </label>
               <input
                 id="password"
@@ -91,7 +127,7 @@ function LoginPage() {
                 autoComplete="current-password"
                 required
                 className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                placeholder="Password"
+                placeholder={t.password}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
@@ -104,7 +140,7 @@ function LoginPage() {
               disabled={loading}
               className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
             >
-              {loading ? 'Signing in...' : 'Sign in'}
+              {loading ? t.signingIn : t.signIn}
             </button>
           </div>
         </form>
@@ -113,13 +149,14 @@ function LoginPage() {
   );
 }
 
-function MainApp() {
+function MainApp({ language, onLanguageChange }: { language: Language; onLanguageChange: (lang: Language) => void }) {
   const [headings, setHeadings] = useState<Heading[]>([]);
   const [scrollPosition, setScrollPosition] = useState<number>(0);
   const [isPreview, setIsPreview] = useState(false);
   const [headingToScroll, setHeadingToScroll] = useState<string | null>(null);
   const [selectedBlogId, setSelectedBlogId] = useState<string | null>(null);
   const [currentView, setCurrentView] = useState<AppView>("blog-editor");
+  const t = translations[language];
 
   useEffect(() => {
     console.log("Current view:", currentView);
@@ -159,7 +196,7 @@ function MainApp() {
       {/* Side Menu */}
       <div className="w-64 bg-gray-800 text-white flex flex-col">
         <div className="p-4 border-b border-gray-700">
-          <h2 className="text-lg font-bold">Admin Panel</h2>
+          <h2 className="text-lg font-bold">{t.adminPanel}</h2>
         </div>
         <nav className="flex-1 flex flex-col p-4 gap-2">
           <button
@@ -174,7 +211,7 @@ function MainApp() {
             }}
           >
             <span>📝</span>
-            <span>Blog Editor</span>
+            <span>{t.blogEditor}</span>
           </button>
           <button
             className={`p-3 rounded flex items-center gap-2 ${
@@ -188,7 +225,7 @@ function MainApp() {
             }}
           >
             <span>🛍️</span>
-            <span>Shop Manager</span>
+            <span>{t.shopManager}</span>
           </button>
           <button
             className={`p-3 rounded flex items-center gap-2 ${
@@ -202,7 +239,7 @@ function MainApp() {
             }}
           >
             <span>🏞️</span>
-            <span>See and Do</span>
+            <span>{t.seeAndDo}</span>
           </button>
           <button
             className={`p-3 rounded flex items-center gap-2 ${
@@ -216,14 +253,42 @@ function MainApp() {
             }}
           >
             <span>🏷️</span>
-            <span>Categories</span>
+            <span>{t.categories}</span>
           </button>
+          
+          {/* Language Toggle */}
+          <div className="mt-auto border-t border-gray-700 pt-4">
+            <div className="mb-2 px-3 text-sm text-gray-400">{t.language}</div>
+            <div className="flex gap-2">
+              <button
+                className={`flex-1 p-2 rounded text-sm ${
+                  language === "en"
+                    ? "bg-blue-600 text-white"
+                    : "bg-gray-700 hover:bg-gray-600"
+                }`}
+                onClick={() => onLanguageChange("en")}
+              >
+                English
+              </button>
+              <button
+                className={`flex-1 p-2 rounded text-sm ${
+                  language === "ja"
+                    ? "bg-blue-600 text-white"
+                    : "bg-gray-700 hover:bg-gray-600"
+                }`}
+                onClick={() => onLanguageChange("ja")}
+              >
+                日本語
+              </button>
+            </div>
+          </div>
+
           <button 
-            className="p-3 rounded flex items-center gap-2 hover:bg-gray-700 mt-auto"
+            className="p-3 rounded flex items-center gap-2 hover:bg-gray-700 mt-4"
             onClick={handleLogout}
           >
             <span>🚪</span>
-            <span>Logout</span>
+            <span>{t.logout}</span>
           </button>
         </nav>
       </div>
@@ -240,7 +305,7 @@ function MainApp() {
               handleViewChange("blog-editor");
             }}
           >
-            Blog Editor
+            {t.blogEditor}
           </button>
           <button
             className={`p-2 rounded ${
@@ -253,7 +318,7 @@ function MainApp() {
               handleViewChange("shop-manager");
             }}
           >
-            Shop Manager
+            {t.shopManager}
           </button>
           <button
             className={`p-2 rounded ${
@@ -266,7 +331,7 @@ function MainApp() {
               handleViewChange("see-and-do");
             }}
           >
-            See and Do
+            {t.seeAndDo}
           </button>
           <button
             className={`p-2 rounded ${
@@ -279,7 +344,7 @@ function MainApp() {
               handleViewChange("categories");
             }}
           >
-            Categories
+            {t.categories}
           </button>
         </div>
         <div className="flex-1 overflow-auto bg-white">
@@ -288,7 +353,8 @@ function MainApp() {
               <div className="w-full md:w-1/4 border-r overflow-auto bg-white">
                 <Bloglist 
                   onBlogSelect={handleBlogSelect} 
-                  onNewBlog={handleNewBlog} 
+                  onNewBlog={handleNewBlog}
+                  language={language}
                 />
               </div>
               <div className="hidden md:block md:w-3/4 overflow-auto bg-red-200">
@@ -300,21 +366,22 @@ function MainApp() {
                     headingToScroll={headingToScroll}
                     onHeadingScrolled={() => setHeadingToScroll(null)}
                     blogId={selectedBlogId}
+                    language={language}
                   />
                 </div>
               </div>
             </div>
           ) : currentView === "shop-manager" ? (
             <div className="h-full overflow-auto bg-white">
-              <ShopManagerPage />
+              <ShopManagerPage language={language} />
             </div>
           ) : currentView === "see-and-do" ? (
             <div className="h-full overflow-auto bg-white">
-              <SeeAndDoManagerPage />
+              <SeeAndDoManagerPage language={language} />
             </div>
           ) : (
             <div className="h-full overflow-auto bg-white">
-              <CategoryManagerPage />
+              <CategoryManagerPage language={language} />
             </div>
           )}
         </div>
@@ -327,6 +394,21 @@ export default function App() {
   const navigate = useNavigate();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [language, setLanguage] = useState<Language>("en");
+
+  // Load language preference
+  useEffect(() => {
+    const savedLanguage = localStorage.getItem("adminLanguage") as Language;
+    if (savedLanguage === "en" || savedLanguage === "ja") {
+      setLanguage(savedLanguage);
+    }
+  }, []);
+
+  // Save language preference
+  const handleLanguageChange = (lang: Language) => {
+    setLanguage(lang);
+    localStorage.setItem("adminLanguage", lang);
+  };
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -354,5 +436,9 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, [navigate]);
 
-  return isAuthenticated ? <MainApp /> : <LoginPage />;
+  return isAuthenticated ? (
+    <MainApp language={language} onLanguageChange={handleLanguageChange} />
+  ) : (
+    <LoginPage language={language} />
+  );
 }
