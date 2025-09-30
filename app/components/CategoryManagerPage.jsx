@@ -87,9 +87,6 @@ if (!supabaseUrl || !supabaseKey) {
 
 const supabase = createClient(supabaseUrl || '', supabaseKey || '');
 
-/**
- * @param {{ language?: "en" | "ja" }} props
- */
 export default function CategoryManagerPage({ language = "en" }) {
   const t = categoryTranslations[language];
   const [categories, setCategories] = useState([]);

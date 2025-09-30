@@ -1,6 +1,117 @@
 import { useState, useEffect } from "react";
 import { createClient } from '@supabase/supabase-js';
 
+type Language = "en" | "ja";
+
+const touristTranslations = {
+  en: {
+    seeAndDoManagement: "See and Do Management",
+    managePlaces: "Manage your tourist places",
+    editPlaceDetails: "Edit tourist place details",
+    createNewPlace: "Create a new tourist place",
+    addNewPlace: "Add New Place",
+    backToPlaces: "Back to Places",
+    allPlaces: "All Tourist Places",
+    place: "Place",
+    places: "Places",
+    noPlacesFound: "No tourist places found. Create your first place!",
+    recommended: "Recommended",
+    near: "Near",
+    edit: "Edit",
+    delete: "Delete",
+    deletePlaceConfirm: "Are you sure you want to delete this tourist place?",
+    basicInformation: "Basic Information",
+    placeName: "Place Name",
+    category: "Category",
+    selectCategory: "Select a category",
+    description: "Description",
+    locationDetails: "Location Details",
+    address: "Address",
+    nearStation: "Near Station",
+    nearestStation: "Nearest station or landmark",
+    openingHours: "Opening Hours",
+    openingHoursPlaceholder: "e.g., 9:00 AM - 6:00 PM",
+    googleMapsEmbed: "Google Maps Embed Code",
+    pasteEmbedCode: "Paste the iframe embed code from Google Maps",
+    extractedLocation: "Extracted location",
+    latitude: "Latitude",
+    longitude: "Longitude",
+    pasteEmbedExtract: "Paste embed code to extract location",
+    contactInformation: "Contact Information",
+    contactPhone: "Contact Phone",
+    contactEmail: "Contact Email",
+    rating: "Rating",
+    reviewCount: "Review Count",
+    loveCount: "Love Count",
+    placeImages: "Place Images",
+    mainImage: "Main Image",
+    mainDisplayImage: "Main display image (recommended 300x300px)",
+    replaceImage: "Replace Image",
+    otherImages: "Other Images",
+    additionalImages: "Additional images (recommended 300x300px)",
+    cancel: "Cancel",
+    updatePlace: "Update Place",
+    createPlace: "Create Place",
+    loading: "Loading...",
+    errorUploadingImage: "Error uploading image",
+    mustSelectImage: "You must select an image to upload.",
+    errorSavingPlace: "Error saving tourist place"
+  },
+  ja: {
+    seeAndDoManagement: "観光地管理",
+    managePlaces: "観光地を管理",
+    editPlaceDetails: "観光地の詳細を編集",
+    createNewPlace: "新しい観光地を作成",
+    addNewPlace: "新しい観光地を追加",
+    backToPlaces: "観光地に戻る",
+    allPlaces: "すべての観光地",
+    place: "観光地",
+    places: "観光地",
+    noPlacesFound: "観光地が見つかりません。最初の観光地を作成してください！",
+    recommended: "おすすめ",
+    near: "近く",
+    edit: "編集",
+    delete: "削除",
+    deletePlaceConfirm: "この観光地を削除してもよろしいですか？",
+    basicInformation: "基本情報",
+    placeName: "観光地名",
+    category: "カテゴリー",
+    selectCategory: "カテゴリーを選択",
+    description: "説明",
+    locationDetails: "場所の詳細",
+    address: "住所",
+    nearStation: "最寄り駅",
+    nearestStation: "最寄りの駅またはランドマーク",
+    openingHours: "営業時間",
+    openingHoursPlaceholder: "例: 9:00 AM - 6:00 PM",
+    googleMapsEmbed: "Google マップ埋め込みコード",
+    pasteEmbedCode: "Google マップからiframe埋め込みコードを貼り付け",
+    extractedLocation: "抽出された場所",
+    latitude: "緯度",
+    longitude: "経度",
+    pasteEmbedExtract: "埋め込みコードを貼り付けて場所を抽出",
+    contactInformation: "連絡先情報",
+    contactPhone: "電話番号",
+    contactEmail: "メールアドレス",
+    rating: "評価",
+    reviewCount: "レビュー数",
+    loveCount: "いいね数",
+    placeImages: "観光地画像",
+    mainImage: "メイン画像",
+    mainDisplayImage: "メイン表示画像（推奨: 300x300px）",
+    replaceImage: "画像を置き換える",
+    otherImages: "その他の画像",
+    additionalImages: "追加画像（推奨: 300x300px）",
+    cancel: "キャンセル",
+    updatePlace: "観光地を更新",
+    createPlace: "観光地を作成",
+    loading: "読み込み中...",
+    errorUploadingImage: "画像のアップロードエラー",
+    mustSelectImage: "アップロードする画像を選択する必要があります。",
+    errorSavingPlace: "観光地の保存エラー"
+  }
+};
+
 // Initialize Supabase client for tourist places
 const supabaseTouristUrl = import.meta.env.VITE_TOURIST_SUPABASE_URL || import.meta.env.VITE_SHOP_SUPABASE_URL;
 const supabaseTouristKey = import.meta.env.VITE_TOURIST_SUPABASE_ANON_KEY || import.meta.env.VITE_SHOP_SUPABASE_ANON_KEY;
@@ -11,12 +122,17 @@ if (!supabaseTouristUrl || !supabaseTouristKey) {
 
 const supabaseTourist = createClient(supabaseTouristUrl || '', supabaseTouristKey || '');
 
-export default function SeeAndDoManagerPage() {
+type SeeAndDoManagerProps = {
+  language: Language;
+};
+
+export default function SeeAndDoManagerPage({ language = "en" }: SeeAndDoManagerProps) {
   const [places, setPlaces] = useState([]);
   const [categories, setCategories] = useState([]);
   const [selectedPlace, setSelectedPlace] = useState(null);
   const [view, setView] = useState("places");
   const [loading, setLoading] = useState(false);
+  const t = touristTranslations[language];
 
   // Fetch all tourist places and categories
   useEffect(() => {
@@ -78,11 +194,11 @@ export default function SeeAndDoManagerPage() {
             
             if (categoryError) {
               console.error(`Error fetching category for place ${place.id}:`, categoryError.message);
-              return { ...place, categories: { name: 'N/A' } };
+              return { ...place, categories: { name: t.noCategory || 'N/A' } };
             }
             return { ...place, categories: { name: categoryData.name } };
           }
-          return { ...place, categories: { name: 'N/A' } };
+          return { ...place, categories: { name: t.noCategory || 'N/A' } };
         }));
         
         setPlaces(enrichedPlaces);
@@ -174,7 +290,7 @@ export default function SeeAndDoManagerPage() {
       setView("places");
     } catch (error) {
       console.error('Error saving tourist place:', error.message);
-      alert('Error saving tourist place: ' + error.message);
+      alert(t.errorSavingPlace + ': ' + error.message);
     } finally {
       setLoading(false);
     }
@@ -182,7 +298,7 @@ export default function SeeAndDoManagerPage() {
 
   // Handle deleting place
   const handleDeletePlace = async (placeId) => {
-    if (!window.confirm("Are you sure you want to delete this tourist place?")) return;
+    if (!window.confirm(t.deletePlaceConfirm)) return;
     
     setLoading(true);
     try {
@@ -199,7 +315,7 @@ export default function SeeAndDoManagerPage() {
       setView("places");
     } catch (error) {
       console.error('Error deleting tourist place:', error.message);
-      alert('Error deleting tourist place: ' + error.message);
+      alert(t.errorSavingPlace + ': ' + error.message);
     } finally {
       setLoading(false);
     }
@@ -212,11 +328,11 @@ export default function SeeAndDoManagerPage() {
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div>
             <h1 className="text-3xl font-bold bg-gradient-to-r from-indigo-400 to-purple-500 bg-clip-text text-transparent">
-              See and Do Management
+              {t.seeAndDoManagement}
             </h1>
             <p className="text-gray-400 mt-1">
-              {view === "places" && "Manage your tourist places"}
-              {view === "editPlace" && (selectedPlace?.id ? "Edit tourist place details" : "Create a new tourist place")}
+              {view === "places" && t.managePlaces}
+              {view === "editPlace" && (selectedPlace?.id ? t.editPlaceDetails : t.createNewPlace)}
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
@@ -228,7 +344,7 @@ export default function SeeAndDoManagerPage() {
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
                 </svg>
-                Add New Place
+                {t.addNewPlace}
               </button>
             )}
             {view === "editPlace" && (
@@ -239,7 +355,7 @@ export default function SeeAndDoManagerPage() {
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
                 </svg>
-                Back to Places
+                {t.backToPlaces}
               </button>
             )}
           </div>
@@ -248,6 +364,7 @@ export default function SeeAndDoManagerPage() {
         {loading && (
           <div className="flex justify-center items-center py-16">
             <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-indigo-500"></div>
+            <span className="ml-4 text-gray-400">{t.loading}</span>
           </div>
         )}
 
@@ -259,6 +376,7 @@ export default function SeeAndDoManagerPage() {
                 places={places}
                 onPlaceSelect={handlePlaceSelect}
                 onPlaceDelete={handleDeletePlace}
+                t={t}
               />
             )}
 
@@ -268,6 +386,7 @@ export default function SeeAndDoManagerPage() {
                 categories={categories}
                 onSave={handleSavePlace}
                 onCancel={() => setView("places")}
+                t={t}
               />
             )}
           </div>
@@ -278,13 +397,13 @@ export default function SeeAndDoManagerPage() {
 }
 
 // PlaceList Component
-function PlaceList({ places, onPlaceSelect, onPlaceDelete }) {
+function PlaceList({ places, onPlaceSelect, onPlaceDelete, t }) {
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-semibold text-gray-100">All Tourist Places</h2>
+        <h2 className="text-2xl font-semibold text-gray-100">{t.allPlaces}</h2>
         <span className="bg-gray-700 text-gray-300 px-3 py-1 rounded-full text-sm">
-          {places.length} {places.length === 1 ? 'Place' : 'Places'}
+          {places.length} {places.length === 1 ? t.place : t.places}
         </span>
       </div>
       
@@ -295,7 +414,7 @@ function PlaceList({ places, onPlaceSelect, onPlaceDelete }) {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
             </svg>
           </div>
-          <p className="text-gray-400 text-lg">No tourist places found. Create your first place!</p>
+          <p className="text-gray-400 text-lg">{t.noPlacesFound}</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -319,14 +438,14 @@ function PlaceList({ places, onPlaceSelect, onPlaceDelete }) {
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
                         <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                       </svg>
-                      Recommended
+                      {t.recommended}
                     </span>
                   )}
                 </div>
               </div>
               <div className="p-5">
                 <h3 className="font-semibold text-xl mb-2 text-white">{place.name}</h3>
-                <p className="text-indigo-300 text-sm mb-3 capitalize">{place.categories?.name || 'N/A'}</p>
+                <p className="text-indigo-300 text-sm mb-3 capitalize">{place.categories?.name || t.noCategory || 'N/A'}</p>
                 <p className="text-gray-400 text-sm mb-4 line-clamp-2">{place.description}</p>
                 
                 {place.near_station && (
@@ -334,7 +453,7 @@ function PlaceList({ places, onPlaceSelect, onPlaceDelete }) {
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
                       <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
                     </svg>
-                    Near: {place.near_station}
+                    {t.near}: {place.near_station}
                   </div>
                 )}
                 
@@ -342,7 +461,7 @@ function PlaceList({ places, onPlaceSelect, onPlaceDelete }) {
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
                     <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                   </svg>
-                  Rating: {place.rating} ({place.review_count} reviews)
+                  {t.rating}: {place.rating} ({place.review_count} {t.reviewCount})
                 </div>
 
                 <div className="flex mt-6 space-x-3">
@@ -353,7 +472,7 @@ function PlaceList({ places, onPlaceSelect, onPlaceDelete }) {
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                       <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
                     </svg>
-                    Edit
+                    {t.edit}
                   </button>
                   <button 
                     onClick={() => onPlaceDelete(place.id)}
@@ -362,6 +481,7 @@ function PlaceList({ places, onPlaceSelect, onPlaceDelete }) {
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                       <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
                     </svg>
+                    {t.delete}
                   </button>
                 </div>
               </div>
@@ -374,7 +494,7 @@ function PlaceList({ places, onPlaceSelect, onPlaceDelete }) {
 }
 
 // PlaceEditor Component
-function PlaceEditor({ place, categories, onSave, onCancel }) {
+function PlaceEditor({ place, categories, onSave, onCancel, t }) {
   const [formData, setFormData] = useState({
     ...place,
     other_images: place.other_images || [],
@@ -430,7 +550,7 @@ function PlaceEditor({ place, categories, onSave, onCancel }) {
       setUploading(true);
       
       if (!e.target.files || e.target.files.length === 0) {
-        throw new Error('You must select an image to upload.');
+        throw new Error(t.mustSelectImage);
       }
       
       const file = e.target.files[0];
@@ -452,7 +572,7 @@ function PlaceEditor({ place, categories, onSave, onCancel }) {
       
     } catch (error) {
       console.error('Error uploading image:', error.message);
-      alert('Error uploading image: ' + error.message);
+      alert(t.errorUploadingImage + ': ' + error.message);
     } finally {
       setUploading(false);
     }
@@ -469,7 +589,7 @@ function PlaceEditor({ place, categories, onSave, onCancel }) {
       setUploadingOther(true);
       
       if (!e.target.files || e.target.files.length === 0) {
-        throw new Error('You must select an image to upload.');
+        throw new Error(t.mustSelectImage);
       }
       
       const file = e.target.files[0];
@@ -491,7 +611,7 @@ function PlaceEditor({ place, categories, onSave, onCancel }) {
       
     } catch (error) {
       console.error('Error uploading image:', error.message);
-      alert('Error uploading image: ' + error.message);
+      alert(t.errorUploadingImage + ': ' + error.message);
     } finally {
       setUploadingOther(false);
     }
@@ -507,7 +627,7 @@ function PlaceEditor({ place, categories, onSave, onCancel }) {
 
   return (
     <div>
-      <h2 className="text-2xl font-semibold mb-6 text-white">{place.id ? "Edit Tourist Place" : "Create New Tourist Place"}</h2>
+      <h2 className="text-2xl font-semibold mb-6 text-white">{place.id ? t.editPlaceDetails : t.createNewPlace}</h2>
       
       <form onSubmit={handleSubmit} className="space-y-8">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -518,12 +638,12 @@ function PlaceEditor({ place, categories, onSave, onCancel }) {
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-indigo-400" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
                 </svg>
-                Basic Information
+                {t.basicInformation}
               </h3>
               
               <div className="space-y-5">
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">Place Name *</label>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">{t.placeName} *</label>
                   <input
                     type="text"
                     name="name"
@@ -535,7 +655,7 @@ function PlaceEditor({ place, categories, onSave, onCancel }) {
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">Category *</label>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">{t.category} *</label>
                   <select
                     name="category_id"
                     value={formData.category_id}
@@ -543,7 +663,7 @@ function PlaceEditor({ place, categories, onSave, onCancel }) {
                     className="w-full px-4 py-3 bg-gray-600 border border-gray-500 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     required
                   >
-                    <option value="">Select a category</option>
+                    <option value="">{t.selectCategory}</option>
                     {categories.map(category => (
                       <option key={category.id} value={category.id}>{category.name}</option>
                     ))}
@@ -551,7 +671,7 @@ function PlaceEditor({ place, categories, onSave, onCancel }) {
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">Description</label>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">{t.description}</label>
                   <textarea
                     name="description"
                     value={formData.description}
@@ -568,12 +688,12 @@ function PlaceEditor({ place, categories, onSave, onCancel }) {
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-indigo-400" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
                 </svg>
-                Location Details
+                {t.locationDetails}
               </h3>
               
               <div className="space-y-5">
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">Address</label>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">{t.address}</label>
                   <input
                     type="text"
                     name="address"
@@ -584,44 +704,44 @@ function PlaceEditor({ place, categories, onSave, onCancel }) {
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">Near Station *</label>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">{t.nearStation} *</label>
                   <input
                     type="text"
                     name="near_station"
                     value={formData.near_station}
                     onChange={handleChange}
                     className="w-full px-4 py-3 bg-gray-600 border border-gray-500 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    placeholder="Nearest station or landmark"
+                    placeholder={t.nearestStation}
                     required
                   />
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">Opening Hours</label>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">{t.openingHours}</label>
                   <input
                     type="text"
                     name="opening_hours"
                     value={formData.opening_hours}
                     onChange={handleChange}
                     className="w-full px-4 py-3 bg-gray-600 border border-gray-500 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    placeholder="e.g., 9:00 AM - 6:00 PM"
+                    placeholder={t.openingHoursPlaceholder}
                   />
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">Google Maps Embed Code</label>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">{t.googleMapsEmbed}</label>
                   <textarea
                     name="map_embed"
                     value={formData.map_embed}
                     onChange={handleChange}
                     rows="3"
                     className="w-full px-4 py-3 bg-gray-600 border border-gray-500 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    placeholder="Paste the iframe embed code from Google Maps"
+                    placeholder={t.pasteEmbedCode}
                   />
                   <p className="mt-2 text-sm text-gray-400">
                     {formData.latitude && formData.longitude 
-                      ? `Extracted location: Latitude ${formData.latitude}, Longitude ${formData.longitude}` 
-                      : 'Paste embed code to extract location'}
+                      ? `${t.extractedLocation}: ${t.latitude} ${formData.latitude}, ${t.longitude} ${formData.longitude}` 
+                      : t.pasteEmbedExtract}
                   </p>
                 </div>
               </div>
@@ -635,12 +755,12 @@ function PlaceEditor({ place, categories, onSave, onCancel }) {
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-indigo-400" viewBox="0 0 20 20" fill="currentColor">
                   <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" />
                 </svg>
-                Contact Information
+                {t.contactInformation}
               </h3>
               
               <div className="space-y-5">
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">Contact Phone</label>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">{t.contactPhone}</label>
                   <input
                     type="tel"
                     name="contact_phone"
@@ -651,7 +771,7 @@ function PlaceEditor({ place, categories, onSave, onCancel }) {
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">Contact Email</label>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">{t.contactEmail}</label>
                   <input
                     type="email"
                     name="contact_email"
@@ -662,7 +782,7 @@ function PlaceEditor({ place, categories, onSave, onCancel }) {
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">Rating</label>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">{t.rating}</label>
                   <input
                     type="number"
                     name="rating"
@@ -676,7 +796,7 @@ function PlaceEditor({ place, categories, onSave, onCancel }) {
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">Review Count</label>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">{t.reviewCount}</label>
                   <input
                     type="number"
                     name="review_count"
@@ -688,7 +808,7 @@ function PlaceEditor({ place, categories, onSave, onCancel }) {
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">Love Count</label>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">{t.loveCount}</label>
                   <input
                     type="number"
                     name="love_count"
@@ -709,7 +829,7 @@ function PlaceEditor({ place, categories, onSave, onCancel }) {
                     className="h-5 w-5 text-indigo-600 focus:ring-indigo-500 border-gray-500 rounded bg-gray-600"
                   />
                   <label htmlFor="is_recommended" className="ml-3 block text-sm text-gray-300 font-medium">
-                    Recommended
+                    {t.recommended}
                   </label>
                 </div>
               </div>
@@ -721,12 +841,12 @@ function PlaceEditor({ place, categories, onSave, onCancel }) {
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-indigo-400" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
                 </svg>
-                Place Images
+                {t.placeImages}
               </h3>
               
               <div className="space-y-6">
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-3">Main Image</label>
+                  <label className="block text-sm font-medium text-gray-300 mb-3">{t.mainImage}</label>
                   <div className="flex items-center space-x-4">
                     {formData.image_url ? (
                       <div className="relative group">
@@ -756,10 +876,10 @@ function PlaceEditor({ place, categories, onSave, onCancel }) {
                       </label>
                     )}
                     <div>
-                      <p className="text-sm text-gray-400">Main display image (recommended 300x300px)</p>
+                      <p className="text-sm text-gray-400">{t.mainDisplayImage}</p>
                       {formData.image_url && (
                         <label className="cursor-pointer text-sm text-indigo-400 hover:text-indigo-300 mt-2 inline-block">
-                          Replace Image
+                          {t.replaceImage}
                           <input
                             type="file"
                             accept="image/*"
@@ -774,7 +894,7 @@ function PlaceEditor({ place, categories, onSave, onCancel }) {
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-3">Other Images</label>
+                  <label className="block text-sm font-medium text-gray-300 mb-3">{t.otherImages}</label>
                   <div className="flex flex-wrap gap-4 mb-4">
                     {formData.other_images.map((url, index) => (
                       <div key={index} className="relative group">
@@ -804,7 +924,7 @@ function PlaceEditor({ place, categories, onSave, onCancel }) {
                       />
                     </label>
                   </div>
-                  <p className="text-sm text-gray-400">Additional images (recommended 300x300px)</p>
+                  <p className="text-sm text-gray-400">{t.additionalImages}</p>
                 </div>
               </div>
             </div>
@@ -818,13 +938,13 @@ function PlaceEditor({ place, categories, onSave, onCancel }) {
             onClick={onCancel}
             className="px-6 py-3 bg-gray-600 hover:bg-gray-500 text-white rounded-lg transition-colors duration-200"
           >
-            Cancel
+            {t.cancel}
           </button>
           <button
             type="submit"
             className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors duration-200"
           >
-            {place.id ? "Update Place" : "Create Place"}
+            {place.id ? t.updatePlace : t.createPlace}
           </button>
         </div>
       </form>
