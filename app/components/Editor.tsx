@@ -154,6 +154,7 @@ export default function Editor({
   const [cursorNode, setCursorNode] = useState<Node | null>(null);
   const [cursorOffset, setCursorOffset] = useState(0);
   const [publishDate, setPublishDate] = useState("");
+  const [showPublishDateDialog, setShowPublishDateDialog] = useState(false);
   const [blogId, setBlogId] = useState<string | null>(initialBlogId || null);
   const [topImage, setTopImage] = useState<string | null>(null);
   const [topImageFileName, setTopImageFileName] = useState<string | null>(null);
@@ -759,6 +760,7 @@ ${imageHtmls.map(html => `<div style="flex: 1;">${html}</div>`).join("\n")}
 
       setSelectedSubcategories(allSubcategories.slice(0, -1));
       setNewSubcategory("");
+      setShowPublishDateDialog(false);
     } catch (error: any) {
       console.error("Save blog error:", error);
       alert("An unexpected error occurred while saving the blog: " + (error.message || "Unknown error"));
@@ -770,6 +772,10 @@ ${imageHtmls.map(html => `<div style="flex: 1;">${html}</div>`).join("\n")}
   };
 
   const handlePublish = () => {
+    setShowPublishDateDialog(true);
+  };
+
+  const handlePublishWithDate = () => {
     if (!publishDate) {
       alert(t.pleaseSelectDate);
       return;
@@ -1039,6 +1045,43 @@ ${imageHtmls.map(html => `<div style="flex: 1;">${html}</div>`).join("\n")}
           >
             {t.close}
           </button>
+        </div>
+      )}
+
+      {showPublishDateDialog && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+          onClick={() => setShowPublishDateDialog(false)}
+        >
+          <div
+            className="bg-white rounded-lg p-6 max-w-md w-full mx-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-xl font-semibold mb-4">{t.publishDate}</h2>
+            <div className="mb-4">
+              <label className="block mb-2 font-medium">{t.selectPublishDate}</label>
+              <input
+                type="date"
+                value={publishDate}
+                onChange={(e) => setPublishDate(e.target.value)}
+                className="w-full p-2 border rounded"
+              />
+            </div>
+            <div className="flex gap-3 justify-end">
+              <button
+                className="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
+                onClick={() => setShowPublishDateDialog(false)}
+              >
+                {t.close}
+              </button>
+              <button
+                className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+                onClick={handlePublishWithDate}
+              >
+                {t.publish}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -1371,17 +1414,6 @@ ${imageHtmls.map(html => `<div style="flex: 1;">${html}</div>`).join("\n")}
           placeholder={t.writeContent}
         />
       )}
-
-      <div className="publish-date-section mt-4 mb-4">
-        <label className="section-label block mb-2 font-semibold">{t.publishDate}</label>
-        <input
-          type="date"
-          value={publishDate}
-          onChange={(e) => setPublishDate(e.target.value)}
-          className="w-full p-2 border rounded"
-          placeholder={t.selectPublishDate}
-        />
-      </div>
 
       <div className="editor-actions flex gap-4 mt-4">
         <button
