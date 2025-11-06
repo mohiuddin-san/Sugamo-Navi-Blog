@@ -82,7 +82,11 @@ const shopTranslations = {
     errorSavingShop: "Error saving shop",
     errorSavingOffer: "Error saving offer",
     errorSavingRecommendation: "Error saving recommendation",
-    noCategory: "No Category"
+    noCategory: "No Category",
+    // NEW FIELDS
+    websiteUrl: "Website URL",
+    paymentMethod: "Payment Method",
+    numberSeats: "Number of Seats"
   },
   ja: {
     shopManagement: "ショップ管理",
@@ -162,7 +166,11 @@ const shopTranslations = {
     errorSavingShop: "ショップの保存エラー",
     errorSavingOffer: "オファーの保存エラー",
     errorSavingRecommendation: "おすすめの保存エラー",
-    noCategory: "カテゴリーなし"
+    noCategory: "カテゴリーなし",
+    // NEW FIELDS
+    websiteUrl: "ウェブサイトURL",
+    paymentMethod: "支払い方法",
+    numberSeats: "座席数"
   }
 };
 
@@ -179,13 +187,13 @@ type ShopManagerProps = {
   language: Language;
 };
 
-export default function ShopApp({ language = "en" }: ShopManagerProps){
-  const [shops, setShops] = useState([]);
-  const [offers, setOffers] = useState([]);
-  const [recommendations, setRecommendations] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [selectedShop, setSelectedShop] = useState(null);
-  const [view, setView] = useState("shops");
+export default function ShopApp({ language = "en" }: ShopManagerProps) {
+  const [shops, setShops] = useState<any[]>([]);
+  const [offers, setOffers] = useState<any[]>([]);
+  const [recommendations, setRecommendations] = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
+  const [selectedShop, setSelectedShop] = useState<any>(null);
+  const [view, setView] = useState<"shops" | "editShop" | "offers" | "recommendations">("shops");
   const [loading, setLoading] = useState(false);
   const t = shopTranslations[language];
 
@@ -202,10 +210,10 @@ export default function ShopApp({ language = "en" }: ShopManagerProps){
         .from('categories')
         .select('id, name')
         .order('name');
-      
+
       if (error) throw error;
       setCategories(data);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching categories:', error.message);
     }
   };
@@ -217,10 +225,10 @@ export default function ShopApp({ language = "en" }: ShopManagerProps){
         .from('shops')
         .select('*')
         .order('name');
-      
+
       if (error) throw error;
       setShops(data);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching shops:', error.message);
     } finally {
       setLoading(false);
@@ -236,10 +244,10 @@ export default function ShopApp({ language = "en" }: ShopManagerProps){
           shops (name)
         `)
         .order('created_at', { ascending: false });
-      
+
       if (error) throw error;
       setOffers(data);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching offers:', error.message);
     }
   };
@@ -253,15 +261,15 @@ export default function ShopApp({ language = "en" }: ShopManagerProps){
           shops (name)
         `)
         .order('priority');
-      
+
       if (error) throw error;
       setRecommendations(data);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching recommendations:', error.message);
     }
   };
 
-  const handleShopSelect = (shop) => {
+  const handleShopSelect = (shop: any) => {
     setSelectedShop(shop);
     setView("editShop");
   };
@@ -281,44 +289,59 @@ export default function ShopApp({ language = "en" }: ShopManagerProps){
       image_url: "",
       other_images: [],
       is_recommended: false,
-      is_best_shop: false
+      is_best_shop: false,
+      map_embed: "",
+      website_url: "",
+      payment_method: "",
+      number_seats: ""
     });
     setView("editShop");
   };
 
-  const handleSaveShop = async (shopData) => {
+  const handleSaveShop = async (shopData: any) => {
     setLoading(true);
     try {
-      const { map_embed, ...saveData } = shopData;
-      const formattedData = { ...saveData };
+     
+      const formattedData = {
+        ...shopData,
+        map_embed: shopData.map_embed || null,
+        latitude: shopData.latitude || null,
+        longitude: shopData.longitude || null,
+      };
+      if (formattedData.other_images) {
+        formattedData.other_images = JSON.stringify(formattedData.other_images);
+      }
 
       if (formattedData.id) {
+        // Update
         const { data, error } = await supabaseShop
           .from('shops')
           .update(formattedData)
           .eq('id', formattedData.id)
           .select();
-        
+
         if (error) throw error;
-        
-        setShops(shops.map(shop => 
-          shop.id === formattedData.id ? data[0] : shop
+
+        setShops(shops.map(shop =>
+          shop.id === formattedData.id ? { ...data[0], other_images: JSON.parse(data[0].other_images || '[]') } : shop
         ));
-        setSelectedShop(data[0]);
+        setSelectedShop({ ...data[0], other_images: JSON.parse(data[0].other_images || '[]') });
       } else {
+        // Insert
         const { data, error } = await supabaseShop
           .from('shops')
           .insert([formattedData])
           .select();
-        
+
         if (error) throw error;
-        
-        setShops([...shops, data[0]]);
-        setSelectedShop(data[0]);
+
+        const newShop = { ...data[0], other_images: JSON.parse(data[0].other_images || '[]') };
+        setShops([...shops, newShop]);
+        setSelectedShop(newShop);
       }
-      
+
       setView("shops");
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving shop:', error.message);
       alert(t.errorSavingShop + ': ' + error.message);
     } finally {
@@ -326,22 +349,22 @@ export default function ShopApp({ language = "en" }: ShopManagerProps){
     }
   };
 
-  const handleDeleteShop = async (shopId) => {
+  const handleDeleteShop = async (shopId: number) => {
     if (!window.confirm(t.deleteShopConfirm)) return;
-    
+
     setLoading(true);
     try {
       const { error } = await supabaseShop
         .from('shops')
         .delete()
         .eq('id', shopId);
-      
+
       if (error) throw error;
-      
+
       setShops(shops.filter(shop => shop.id !== shopId));
       setSelectedShop(null);
       setView("shops");
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error deleting shop:', error.message);
     } finally {
       setLoading(false);
@@ -366,7 +389,7 @@ export default function ShopApp({ language = "en" }: ShopManagerProps){
           <div className="flex flex-wrap gap-3">
             {view === "shops" && (
               <>
-                <button 
+                <button
                   onClick={handleNewShop}
                   className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-all duration-200 flex items-center gap-2 shadow-sm"
                 >
@@ -375,7 +398,7 @@ export default function ShopApp({ language = "en" }: ShopManagerProps){
                   </svg>
                   {t.addNewShop}
                 </button>
-                <button 
+                <button
                   onClick={() => setView("offers")}
                   className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-all duration-200 flex items-center gap-2 shadow-sm"
                 >
@@ -384,7 +407,7 @@ export default function ShopApp({ language = "en" }: ShopManagerProps){
                   </svg>
                   {t.manageOffers}
                 </button>
-                <button 
+                <button
                   onClick={() => setView("recommendations")}
                   className="px-5 py-2.5 bg-violet-600 hover:bg-violet-700 text-white rounded-lg transition-all duration-200 flex items-center gap-2 shadow-sm"
                 >
@@ -396,7 +419,7 @@ export default function ShopApp({ language = "en" }: ShopManagerProps){
               </>
             )}
             {(view === "editShop" || view === "offers" || view === "recommendations") && (
-              <button 
+              <button
                 onClick={() => setView("shops")}
                 className="px-5 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg transition-all duration-200 flex items-center gap-2"
               >
@@ -418,7 +441,7 @@ export default function ShopApp({ language = "en" }: ShopManagerProps){
         {!loading && (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             {view === "shops" && (
-              <ShopList 
+              <ShopList
                 shops={shops}
                 categories={categories}
                 onShopSelect={handleShopSelect}
@@ -428,7 +451,7 @@ export default function ShopApp({ language = "en" }: ShopManagerProps){
             )}
 
             {view === "editShop" && (
-              <ShopEditor 
+              <ShopEditor
                 shop={selectedShop}
                 categories={categories}
                 onSave={handleSaveShop}
@@ -438,7 +461,7 @@ export default function ShopApp({ language = "en" }: ShopManagerProps){
             )}
 
             {view === "offers" && (
-              <OfferManager 
+              <OfferManager
                 offers={offers}
                 shops={shops}
                 onSave={fetchOffers}
@@ -448,7 +471,7 @@ export default function ShopApp({ language = "en" }: ShopManagerProps){
             )}
 
             {view === "recommendations" && (
-              <RecommendationManager 
+              <RecommendationManager
                 recommendations={recommendations}
                 shops={shops}
                 onSave={fetchRecommendations}
@@ -463,9 +486,10 @@ export default function ShopApp({ language = "en" }: ShopManagerProps){
   );
 }
 
-function ShopList({ shops, categories, onShopSelect, onShopDelete, t }) {
-  const getCategoryName = (categoryId) => {
-    const category = categories.find(cat => cat.id === categoryId);
+/* ==================== ShopList ==================== */
+function ShopList({ shops, categories, onShopSelect, onShopDelete, t }: any) {
+  const getCategoryName = (categoryId: number) => {
+    const category = categories.find((cat: any) => cat.id === categoryId);
     return category ? category.name : t.noCategory;
   };
 
@@ -477,7 +501,7 @@ function ShopList({ shops, categories, onShopSelect, onShopDelete, t }) {
           {shops.length} {shops.length === 1 ? t.shop : t.shops}
         </span>
       </div>
-      
+
       {shops.length === 0 ? (
         <div className="text-center py-16 bg-gray-50 rounded-lg border border-gray-200">
           <div className="mx-auto w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4">
@@ -489,19 +513,17 @@ function ShopList({ shops, categories, onShopSelect, onShopDelete, t }) {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {shops.map(shop => (
+          {shops.map((shop: any) => (
             <div key={shop.id} className="bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-all duration-300 hover:-translate-y-1 border border-gray-200">
               <div className="h-48 bg-gray-100 flex items-center justify-center overflow-hidden relative">
                 {shop.image_url ? (
-                  <img 
-                    src={shop.image_url} 
-                    alt={shop.name} 
+                  <img
+                    src={shop.image_url}
+                    alt={shop.name}
                     className="w-full h-full object-cover"
                   />
                 ) : (
-                  <div className="text-gray-400 text-6xl">
-                    🏪
-                  </div>
+                  <div className="text-gray-400 text-6xl">Store</div>
                 )}
                 <div className="absolute top-3 right-3 flex gap-2">
                   {shop.is_recommended && (
@@ -526,7 +548,7 @@ function ShopList({ shops, categories, onShopSelect, onShopDelete, t }) {
                 <h3 className="font-semibold text-xl mb-2 text-gray-900">{shop.name}</h3>
                 <p className="text-indigo-600 text-sm mb-3 capitalize">{getCategoryName(shop.category_id)}</p>
                 <p className="text-gray-600 text-sm mb-4 line-clamp-2">{shop.description}</p>
-                
+
                 {shop.near_station && (
                   <div className="flex items-center text-sm text-gray-600 mb-2">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
@@ -535,9 +557,9 @@ function ShopList({ shops, categories, onShopSelect, onShopDelete, t }) {
                     {t.near}: {shop.near_station}
                   </div>
                 )}
-                
+
                 <div className="flex mt-6 space-x-3">
-                  <button 
+                  <button
                     onClick={() => onShopSelect(shop)}
                     className="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors duration-200 flex items-center justify-center gap-2"
                   >
@@ -546,7 +568,7 @@ function ShopList({ shops, categories, onShopSelect, onShopDelete, t }) {
                     </svg>
                     {t.edit}
                   </button>
-                  <button 
+                  <button
                     onClick={() => onShopDelete(shop.id)}
                     className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors duration-200 flex items-center justify-center"
                   >
@@ -564,79 +586,89 @@ function ShopList({ shops, categories, onShopSelect, onShopDelete, t }) {
   );
 }
 
-function ShopEditor({ shop, categories, onSave, onCancel, t }) {
+
+function ShopEditor({ shop, categories, onSave, onCancel, t }: any) {
   const [formData, setFormData] = useState({
     ...shop,
     category_id: shop.category_id || '',
     other_images: shop.other_images || [],
-    map_embed: '',
+    map_embed: shop.map_embed || '',
     opening_hours: shop.opening_hours || "",
-    near_station: shop.near_station || ""
+    near_station: shop.near_station || "",
+    website_url: shop.website_url || "",
+    payment_method: shop.payment_method || "",
+    number_seats: shop.number_seats || ""
   });
   const [uploading, setUploading] = useState(false);
   const [uploadingOther, setUploadingOther] = useState(false);
 
-  const extractLatLng = (embedCode) => {
-    if (!embedCode) return { lat: null, lng: null };
-    const match = embedCode.match(/src="([^"]+)"/);
-    if (!match) return { lat: null, lng: null };
-    const src = match[1];
-    const lngMatch = src.match(/!2d([-\d.]+)/);
-    const latMatch = src.match(/!3d([-\d.]+)/);
-    return {
-      lat: latMatch ? parseFloat(latMatch[1]) : null,
-      lng: lngMatch ? parseFloat(lngMatch[1]) : null
-    };
+ const extractLatLng = (embedCode: string) => {
+  if (!embedCode) return { lat: null, lng: null };
+  
+  const srcMatch = embedCode.match(/src="([^"]+)"/);
+  if (!srcMatch) return { lat: null, lng: null };
+  
+  const src = srcMatch[1];
+  
+  const latMatch = src.match(/!3d([-\d.]+)/);
+  const lngMatch = src.match(/!2d([-\d.]+)/);
+  
+  return {
+    lat: latMatch ? parseFloat(latMatch[1]) : null,
+    lng: lngMatch ? parseFloat(lngMatch[1]) : null
   };
+};
 
-  const handleChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setFormData((prev) => ({
+const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+  const { name, value, type } = e.target as any;
+  const checked = (e.target as HTMLInputElement).checked;
+
+  setFormData((prev: any) => ({
+    ...prev,
+    [name]: type === 'checkbox' ? checked : value
+  }));
+
+  if (name === 'map_embed') {
+    const { lat, lng } = extractLatLng(value);
+    setFormData((prev: any) => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : value
+      latitude: lat,
+      longitude: lng
     }));
+  }
+};
 
-    if (name === 'map_embed') {
-      const { lat, lng } = extractLatLng(value);
-      setFormData((prev) => ({
-        ...prev,
-        latitude: lat,
-        longitude: lng
-      }));
-    }
-  };
-
-  const handleSubmit = (e) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSave(formData);
   };
 
-  const uploadImage = async (e) => {
+  const uploadImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
     try {
       setUploading(true);
-      
+
       if (!e.target.files || e.target.files.length === 0) {
         throw new Error(t.mustSelectImage);
       }
-      
+
       const file = e.target.files[0];
       const fileExt = file.name.split('.').pop();
       const fileName = `${Math.random()}.${fileExt}`;
       const filePath = `shop-images/${fileName}`;
-      
+
       const { error: uploadError } = await supabaseShop.storage
         .from('shop-images')
         .upload(filePath, file);
-      
+
       if (uploadError) throw uploadError;
-      
+
       const { data: { publicUrl } } = supabaseShop.storage
         .from('shop-images')
         .getPublicUrl(filePath);
-      
-      setFormData((prev) => ({ ...prev, image_url: publicUrl }));
-      
-    } catch (error) {
+
+      setFormData((prev: any) => ({ ...prev, image_url: publicUrl }));
+
+    } catch (error: any) {
       console.error('Error uploading image:', error.message);
       alert(t.errorUploadingImage + ': ' + error.message);
     } finally {
@@ -645,35 +677,35 @@ function ShopEditor({ shop, categories, onSave, onCancel, t }) {
   };
 
   const removeImage = () => {
-    setFormData((prev) => ({ ...prev, image_url: '' }));
+    setFormData((prev: any) => ({ ...prev, image_url: '' }));
   };
 
-  const uploadOtherImage = async (e) => {
+  const uploadOtherImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
     try {
       setUploadingOther(true);
-      
+
       if (!e.target.files || e.target.files.length === 0) {
         throw new Error(t.mustSelectImage);
       }
-      
+
       const file = e.target.files[0];
       const fileExt = file.name.split('.').pop();
       const fileName = `${Math.random()}.${fileExt}`;
       const filePath = `shop-other-images/${fileName}`;
-      
+
       const { error: uploadError } = await supabaseShop.storage
         .from('shop-other-images')
         .upload(filePath, file);
-      
+
       if (uploadError) throw uploadError;
-      
+
       const { data: { publicUrl } } = supabaseShop.storage
         .from('shop-other-images')
         .getPublicUrl(filePath);
-      
-      setFormData((prev) => ({ ...prev, other_images: [...prev.other_images, publicUrl] }));
-      
-    } catch (error) {
+
+      setFormData((prev: any) => ({ ...prev, other_images: [...prev.other_images, publicUrl] }));
+
+    } catch (error: any) {
       console.error('Error uploading image:', error.message);
       alert(t.errorUploadingImage + ': ' + error.message);
     } finally {
@@ -681,20 +713,21 @@ function ShopEditor({ shop, categories, onSave, onCancel, t }) {
     }
   };
 
-  const removeOtherImage = (index) => {
-    setFormData((prev) => ({
+  const removeOtherImage = (index: number) => {
+    setFormData((prev: any) => ({
       ...prev,
-      other_images: prev.other_images.filter((_, i) => i !== index)
+      other_images: prev.other_images.filter((_: any, i: number) => i !== index)
     }));
   };
 
   return (
     <div>
       <h2 className="text-2xl font-semibold mb-6 text-gray-900">{shop.id ? t.editShop : t.createShop}</h2>
-      
-      <div className="space-y-8">
+
+      <form onSubmit={handleSubmit} className="space-y-8">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <div className="space-y-6">
+            {/* Basic Information */}
             <div className="bg-white border border-gray-200 p-5 rounded-lg">
               <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-indigo-600" viewBox="0 0 20 20" fill="currentColor">
@@ -702,7 +735,7 @@ function ShopEditor({ shop, categories, onSave, onCancel, t }) {
                 </svg>
                 {t.basicInformation}
               </h3>
-              
+
               <div className="space-y-5">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">{t.shopName} *</label>
@@ -715,7 +748,7 @@ function ShopEditor({ shop, categories, onSave, onCancel, t }) {
                     required
                   />
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">{t.category} *</label>
                   <select
@@ -726,25 +759,60 @@ function ShopEditor({ shop, categories, onSave, onCancel, t }) {
                     required
                   >
                     <option value="">{t.selectCategory}</option>
-                    {categories.map(category => (
+                    {categories.map((category: any) => (
                       <option key={category.id} value={category.id}>{category.name}</option>
                     ))}
                   </select>
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">{t.description}</label>
                   <textarea
                     name="description"
                     value={formData.description}
                     onChange={handleChange}
-                    rows="4"
+                    rows={4}
+                    className="w-full h-96 px-4 py-3 bg-white border border-gray-300 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">{t.websiteUrl}</label>
+                  <input
+                    type="url"
+                    name="website_url"
+                    value={formData.website_url}
+                    onChange={handleChange}
+                    placeholder="https://example.com"
+                    className="w-full px-4 py-3 bg-white border border-gray-300 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">{t.paymentMethod}</label>
+                  <input
+                    type="text"
+                    name="payment_method"
+                    value={formData.payment_method}
+                    onChange={handleChange}
+                    placeholder="Cash, Credit Card, Mobile Pay..."
+                    className="w-full h-72 px-4 py-3 bg-white border border-gray-300 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">{t.numberSeats}</label>
+                  <input
+                    type="text"
+                    name="number_seats"
+                    value={formData.number_seats}
+                    onChange={handleChange}
+                    placeholder="e.g., 50"
                     className="w-full px-4 py-3 bg-white border border-gray-300 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                   />
                 </div>
               </div>
             </div>
-            
             <div className="bg-white border border-gray-200 p-5 rounded-lg">
               <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-indigo-600" viewBox="0 0 20 20" fill="currentColor">
@@ -752,7 +820,7 @@ function ShopEditor({ shop, categories, onSave, onCancel, t }) {
                 </svg>
                 {t.locationDetails}
               </h3>
-              
+
               <div className="space-y-5">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">{t.address}</label>
@@ -764,7 +832,7 @@ function ShopEditor({ shop, categories, onSave, onCancel, t }) {
                     className="w-full px-4 py-3 bg-white border border-gray-300 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                   />
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">{t.nearStation} *</label>
                   <input
@@ -777,7 +845,7 @@ function ShopEditor({ shop, categories, onSave, onCancel, t }) {
                     required
                   />
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">{t.openingHours}</label>
                   <input
@@ -789,27 +857,27 @@ function ShopEditor({ shop, categories, onSave, onCancel, t }) {
                     placeholder={t.openingHoursPlaceholder}
                   />
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">{t.googleMapsEmbed}</label>
                   <textarea
                     name="map_embed"
-                    value={formData.map_embed}
+                    value={formData.map_embed || ''}
                     onChange={handleChange}
-                    rows="3"
+                    rows={3}
                     className="w-full px-4 py-3 bg-white border border-gray-300 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                     placeholder={t.pasteEmbedCode}
                   />
                   <p className="mt-2 text-sm text-gray-600">
-                    {formData.latitude && formData.longitude 
-                      ? `${t.extractedLocation}: ${t.latitude} ${formData.latitude}, ${t.longitude} ${formData.longitude}` 
+                    {formData.latitude && formData.longitude
+                      ? `${t.extractedLocation}: ${t.latitude} ${formData.latitude}, ${t.longitude} ${formData.longitude}`
                       : t.pasteEmbedExtract}
                   </p>
                 </div>
               </div>
             </div>
           </div>
-          
+
           <div className="space-y-6">
             <div className="bg-white border border-gray-200 p-5 rounded-lg">
               <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
@@ -818,7 +886,7 @@ function ShopEditor({ shop, categories, onSave, onCancel, t }) {
                 </svg>
                 {t.contactInformation}
               </h3>
-              
+
               <div className="space-y-5">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">{t.contactPhone}</label>
@@ -830,7 +898,7 @@ function ShopEditor({ shop, categories, onSave, onCancel, t }) {
                     className="w-full px-4 py-3 bg-white border border-gray-300 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                   />
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">{t.contactEmail}</label>
                   <input
@@ -841,7 +909,7 @@ function ShopEditor({ shop, categories, onSave, onCancel, t }) {
                     className="w-full px-4 py-3 bg-white border border-gray-300 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                   />
                 </div>
-                
+
                 <div className="grid grid-cols-2 gap-4 pt-2">
                   <div className="flex items-center">
                     <input
@@ -856,7 +924,7 @@ function ShopEditor({ shop, categories, onSave, onCancel, t }) {
                       {t.recommended}
                     </label>
                   </div>
-                  
+
                   <div className="flex items-center">
                     <input
                       type="checkbox"
@@ -873,7 +941,8 @@ function ShopEditor({ shop, categories, onSave, onCancel, t }) {
                 </div>
               </div>
             </div>
-            
+
+            {/* Shop Images */}
             <div className="bg-white border border-gray-200 p-5 rounded-lg">
               <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-indigo-600" viewBox="0 0 20 20" fill="currentColor">
@@ -881,7 +950,7 @@ function ShopEditor({ shop, categories, onSave, onCancel, t }) {
                 </svg>
                 {t.shopImages}
               </h3>
-              
+
               <div className="space-y-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-3">{t.shopMainImage}</label>
@@ -930,11 +999,11 @@ function ShopEditor({ shop, categories, onSave, onCancel, t }) {
                     </div>
                   </div>
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-3">{t.otherImages}</label>
                   <div className="flex flex-wrap gap-4 mb-4">
-                    {formData.other_images.map((url, index) => (
+                    {formData.other_images.map((url: string, index: number) => (
                       <div key={index} className="relative group">
                         <img src={url} alt={`Shop image ${index + 1}`} className="h-28 w-28 object-cover rounded-lg shadow-sm border border-gray-200" />
                         <button
@@ -946,7 +1015,7 @@ function ShopEditor({ shop, categories, onSave, onCancel, t }) {
                         </button>
                       </div>
                     ))}
-                    
+
                     <label className="cursor-pointer bg-white border-2 border-dashed border-gray-300 rounded-lg h-28 w-28 flex items-center justify-center hover:border-indigo-400 transition-colors">
                       {uploadingOther ? (
                         <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-indigo-600"></div>
@@ -968,7 +1037,7 @@ function ShopEditor({ shop, categories, onSave, onCancel, t }) {
             </div>
           </div>
         </div>
-        
+
         <div className="flex justify-end space-x-4 pt-8 border-t border-gray-200">
           <button
             type="button"
@@ -978,21 +1047,20 @@ function ShopEditor({ shop, categories, onSave, onCancel, t }) {
             {t.cancel}
           </button>
           <button
-            type="button"
-            onClick={handleSubmit}
+            type="submit"
             className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors duration-200"
           >
             {shop.id ? t.updateShop : t.createShopBtn}
           </button>
         </div>
-      </div>
+      </form>
     </div>
   );
 }
 
-// OfferManager Component
-function OfferManager({ offers, shops, onSave, onDelete, t }) {
-  const [selectedOffer, setSelectedOffer] = useState(null);
+/* ==================== OfferManager & RecommendationManager (Unchanged) ==================== */
+function OfferManager({ offers, shops, onSave, onDelete, t }: any) {
+  const [selectedOffer, setSelectedOffer] = useState<any>(null);
   const [formData, setFormData] = useState({
     shop_id: "",
     title: "",
@@ -1015,7 +1083,7 @@ function OfferManager({ offers, shops, onSave, onDelete, t }) {
     });
   };
 
-  const handleEditOffer = (offer) => {
+  const handleEditOffer = (offer: any) => {
     setSelectedOffer(offer);
     setFormData({
       shop_id: offer.shop_id,
@@ -1027,15 +1095,15 @@ function OfferManager({ offers, shops, onSave, onDelete, t }) {
     });
   };
 
-  const handleChange = (e) => {
+  const handleChange = (e: any) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({
+    setFormData((prev: any) => ({
       ...prev,
       [name]: value
     }));
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: any) => {
     e.preventDefault();
     setUploading(true);
     try {
@@ -1044,16 +1112,16 @@ function OfferManager({ offers, shops, onSave, onDelete, t }) {
           .from('offers')
           .update(formData)
           .eq('id', selectedOffer.id);
-        
+
         if (error) throw error;
       } else {
         const { error } = await supabaseShop
           .from('offers')
           .insert([formData]);
-        
+
         if (error) throw error;
       }
-      
+
       onSave();
       setSelectedOffer(null);
       setFormData({
@@ -1064,7 +1132,7 @@ function OfferManager({ offers, shops, onSave, onDelete, t }) {
         valid_until: "",
         image_url: ""
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving offer:', error.message);
       alert(t.errorSavingOffer + ': ' + error.message);
     } finally {
@@ -1072,49 +1140,49 @@ function OfferManager({ offers, shops, onSave, onDelete, t }) {
     }
   };
 
-  const handleDeleteOffer = async (offerId) => {
+  const handleDeleteOffer = async (offerId: number) => {
     if (!window.confirm(t.deleteOfferConfirm)) return;
-    
+
     try {
       const { error } = await supabaseShop
         .from('offers')
         .delete()
         .eq('id', offerId);
-      
+
       if (error) throw error;
       onDelete();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error deleting offer:', error.message);
       alert(t.errorSavingOffer + ': ' + error.message);
     }
   };
 
-  const uploadImage = async (e) => {
+  const uploadImage = async (e: any) => {
     try {
       setUploading(true);
-      
+
       if (!e.target.files || e.target.files.length === 0) {
         throw new Error(t.mustSelectImage);
       }
-      
+
       const file = e.target.files[0];
       const fileExt = file.name.split('.').pop();
       const fileName = `${Math.random()}.${fileExt}`;
       const filePath = `offer-images/${fileName}`;
-      
+
       const { error: uploadError } = await supabaseShop.storage
         .from('offer-images')
         .upload(filePath, file);
-      
+
       if (uploadError) throw uploadError;
-      
+
       const { data: { publicUrl } } = supabaseShop.storage
         .from('offer-images')
         .getPublicUrl(filePath);
-      
-      setFormData((prev) => ({ ...prev, image_url: publicUrl }));
-      
-    } catch (error) {
+
+      setFormData((prev: any) => ({ ...prev, image_url: publicUrl }));
+
+    } catch (error: any) {
       console.error('Error uploading image:', error.message);
       alert(t.errorUploadingImage + ': ' + error.message);
     } finally {
@@ -1153,7 +1221,7 @@ function OfferManager({ offers, shops, onSave, onDelete, t }) {
                 required
               >
                 <option value="">{t.selectCategory.replace('category', 'shop')}</option>
-                {shops.map(shop => (
+                {shops.map((shop: any) => (
                   <option key={shop.id} value={shop.id}>{shop.name}</option>
                 ))}
               </select>
@@ -1206,7 +1274,7 @@ function OfferManager({ offers, shops, onSave, onDelete, t }) {
                     <img src={formData.image_url} alt="Offer" className="h-28 w-28 object-cover rounded-lg shadow-sm border border-gray-200" />
                     <button
                       type="button"
-                      onClick={() => setFormData((prev) => ({ ...prev, image_url: '' }))}
+                      onClick={() => setFormData((prev: any) => ({ ...prev, image_url: '' }))}
                       className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 text-xs opacity-0 group-hover:opacity-100 transition-opacity"
                     >
                       ×
@@ -1253,17 +1321,17 @@ function OfferManager({ offers, shops, onSave, onDelete, t }) {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {offers.map(offer => (
+        {offers.map((offer: any) => (
           <div key={offer.id} className="bg-white rounded-lg shadow-sm overflow-hidden border border-gray-200">
             <div className="h-48 bg-gray-100 flex items-center justify-center overflow-hidden">
               {offer.image_url ? (
-                <img 
-                  src={offer.image_url} 
-                  alt={offer.title} 
+                <img
+                  src={offer.image_url}
+                  alt={offer.title}
                   className="w-full h-full object-cover"
                 />
               ) : (
-                <div className="text-gray-400 text-6xl">🎁</div>
+                <div className="text-gray-400 text-6xl">Gift</div>
               )}
             </div>
             <div className="p-5">
@@ -1301,9 +1369,8 @@ function OfferManager({ offers, shops, onSave, onDelete, t }) {
   );
 }
 
-// RecommendationManager Component
-function RecommendationManager({ recommendations, shops, onSave, onDelete, t }) {
-  const [selectedRecommendation, setSelectedRecommendation] = useState(null);
+function RecommendationManager({ recommendations, shops, onSave, onDelete, t }: any) {
+  const [selectedRecommendation, setSelectedRecommendation] = useState<any>(null);
   const [formData, setFormData] = useState({
     shop_id: "",
     priority: 1,
@@ -1318,7 +1385,7 @@ function RecommendationManager({ recommendations, shops, onSave, onDelete, t }) 
     });
   };
 
-  const handleEditRecommendation = (recommendation) => {
+  const handleEditRecommendation = (recommendation: any) => {
     setSelectedRecommendation(recommendation);
     setFormData({
       shop_id: recommendation.shop_id,
@@ -1326,15 +1393,15 @@ function RecommendationManager({ recommendations, shops, onSave, onDelete, t }) 
     });
   };
 
-  const handleChange = (e) => {
+  const handleChange = (e: any) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({
+    setFormData((prev: any) => ({
       ...prev,
       [name]: name === 'priority' ? parseInt(value) : value
     }));
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: any) => {
     e.preventDefault();
     setUploading(true);
     try {
@@ -1343,23 +1410,23 @@ function RecommendationManager({ recommendations, shops, onSave, onDelete, t }) 
           .from('recommendations')
           .update(formData)
           .eq('id', selectedRecommendation.id);
-        
+
         if (error) throw error;
       } else {
         const { error } = await supabaseShop
           .from('recommendations')
           .insert([formData]);
-        
+
         if (error) throw error;
       }
-      
+
       onSave();
       setSelectedRecommendation(null);
       setFormData({
         shop_id: "",
         priority: 1,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving recommendation:', error.message);
       alert(t.errorSavingRecommendation + ': ' + error.message);
     } finally {
@@ -1367,18 +1434,18 @@ function RecommendationManager({ recommendations, shops, onSave, onDelete, t }) 
     }
   };
 
-  const handleDeleteRecommendation = async (recommendationId) => {
+  const handleDeleteRecommendation = async (recommendationId: number) => {
     if (!window.confirm(t.deleteRecommendationConfirm)) return;
-    
+
     try {
       const { error } = await supabaseShop
         .from('recommendations')
         .delete()
         .eq('id', recommendationId);
-      
+
       if (error) throw error;
       onDelete();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error deleting recommendation:', error.message);
       alert(t.errorSavingRecommendation + ': ' + error.message);
     }
@@ -1415,7 +1482,7 @@ function RecommendationManager({ recommendations, shops, onSave, onDelete, t }) 
                 required
               >
                 <option value="">{t.selectCategory.replace('category', 'shop')}</option>
-                {shops.map(shop => (
+                {shops.map((shop: any) => (
                   <option key={shop.id} value={shop.id}>{shop.name}</option>
                 ))}
               </select>
@@ -1431,7 +1498,7 @@ function RecommendationManager({ recommendations, shops, onSave, onDelete, t }) 
                 min="1"
               />
             </div>
-            
+
             <div className="flex justify-end space-x-4 pt-4">
               <button
                 type="button"
@@ -1454,17 +1521,17 @@ function RecommendationManager({ recommendations, shops, onSave, onDelete, t }) 
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {recommendations.map(recommendation => (
+        {recommendations.map((recommendation: any) => (
           <div key={recommendation.id} className="bg-white rounded-lg shadow-sm overflow-hidden border border-gray-200">
             <div className="h-48 bg-gray-100 flex items-center justify-center overflow-hidden">
               {recommendation.image_url ? (
-                <img 
-                  src={recommendation.image_url} 
-                  alt={recommendation.title} 
+                <img
+                  src={recommendation.image_url}
+                  alt={recommendation.title}
                   className="w-full h-full object-cover"
                 />
               ) : (
-                <div className="text-gray-400 text-6xl">🌟</div>
+                <div className="text-gray-400 text-6xl">Star</div>
               )}
             </div>
             <div className="p-5">
