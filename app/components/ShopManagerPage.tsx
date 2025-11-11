@@ -216,33 +216,33 @@ export default function ShopApp({ language = "en" }: ShopManagerProps) {
     }
   };
 
-const fetchShops = async () => {
-  setLoading(true);
-  try {
-    const { data, error } = await supabaseShop
-      .from('shops')
-      .select('*')
-      .order('name');
+  const fetchShops = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabaseShop
+        .from('shops')
+        .select('*')
+        .order('name');
 
-    if (error) throw error;
+      if (error) throw error;
 
-    const safeData = data.map(shop => ({
-      ...shop,
-      other_images: typeof shop.other_images === 'string' 
-        ? JSON.parse(shop.other_images) 
-        : (Array.isArray(shop.other_images) ? shop.other_images : []),
-      website_url: shop.website_url || "",
-      payment_method: shop.payment_method || "",
-      number_seats: shop.number_seats || ""
-    }));
+      const safeData = data.map(shop => ({
+        ...shop,
+        other_images: typeof shop.other_images === 'string'
+          ? JSON.parse(shop.other_images)
+          : (Array.isArray(shop.other_images) ? shop.other_images : []),
+        website_url: shop.website_url || "",
+        payment_method: shop.payment_method || "",
+        number_seats: shop.number_seats || ""
+      }));
 
-    setShops(safeData);
-  } catch (error: any) {
-    console.error('Error fetching shops:', error.message);
-  } finally {
-    setLoading(false);
-  }
-};
+      setShops(safeData);
+    } catch (error: any) {
+      console.error('Error fetching shops:', error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const fetchOffers = async () => {
     try {
@@ -278,19 +278,19 @@ const fetchShops = async () => {
     }
   };
 
-const handleShopSelect = (shop: any) => {
-  const safeShop = {
-    ...shop,
-    other_images: typeof shop.other_images === 'string' 
-      ? JSON.parse(shop.other_images) 
-      : (Array.isArray(shop.other_images) ? shop.other_images : []),
-    website_url: shop.website_url || "",
-    payment_method: shop.payment_method || "",
-    number_seats: shop.number_seats || ""
+  const handleShopSelect = (shop: any) => {
+    const safeShop = {
+      ...shop,
+      other_images: typeof shop.other_images === 'string'
+        ? JSON.parse(shop.other_images)
+        : (Array.isArray(shop.other_images) ? shop.other_images : []),
+      website_url: shop.website_url || "",
+      payment_method: shop.payment_method || "",
+      number_seats: shop.number_seats || ""
+    };
+    setSelectedShop(safeShop);
+    setView("editShop");
   };
-  setSelectedShop(safeShop);
-  setView("editShop");
-};
 
   const handleNewShop = () => {
     setSelectedShop({
@@ -316,59 +316,59 @@ const handleShopSelect = (shop: any) => {
     setView("editShop");
   };
 
-const handleSaveShop = async (shopData: any) => {
-  setLoading(true);
-  try {
-    const formattedData = {
-      ...shopData,
-      map_embed: shopData.map_embed || null,
-      latitude: shopData.latitude || null,
-      longitude: shopData.longitude || null,
-      // jsonb ফিল্ডে string পাঠাতে হবে
-      other_images: Array.isArray(shopData.other_images) 
-        ? JSON.stringify(shopData.other_images) 
-        : '[]'
-    };
+  const handleSaveShop = async (shopData: any) => {
+    setLoading(true);
+    try {
+      const formattedData = {
+        ...shopData,
+        map_embed: shopData.map_embed || null,
+        latitude: shopData.latitude || null,
+        longitude: shopData.longitude || null,
+        // jsonb ফিল্ডে string পাঠাতে হবে
+        other_images: Array.isArray(shopData.other_images)
+          ? JSON.stringify(shopData.other_images)
+          : '[]'
+      };
 
-    let data, error;
+      let data, error;
 
-    if (formattedData.id) {
-      ({ data, error } = await supabaseShop
-        .from('shops')
-        .update(formattedData)
-        .eq('id', formattedData.id)
-        .select());
-    } else {
-      ({ data, error } = await supabaseShop
-        .from('shops')
-        .insert([formattedData])
-        .select());
+      if (formattedData.id) {
+        ({ data, error } = await supabaseShop
+          .from('shops')
+          .update(formattedData)
+          .eq('id', formattedData.id)
+          .select());
+      } else {
+        ({ data, error } = await supabaseShop
+          .from('shops')
+          .insert([formattedData])
+          .select());
+      }
+
+      if (error) throw error;
+
+      const savedShop = {
+        ...data[0],
+        other_images: typeof data[0].other_images === 'string'
+          ? JSON.parse(data[0].other_images)
+          : (Array.isArray(data[0].other_images) ? data[0].other_images : [])
+      };
+
+      if (formattedData.id) {
+        setShops(shops.map(s => s.id === savedShop.id ? savedShop : s));
+        setSelectedShop(savedShop);
+      } else {
+        setShops([...shops, savedShop]);
+        setSelectedShop(savedShop);
+      }
+
+      setView("shops");
+    } catch (error: any) {
+      alert(t.errorSavingShop + ': ' + error.message);
+    } finally {
+      setLoading(false);
     }
-
-    if (error) throw error;
-
-    const savedShop = {
-      ...data[0],
-      other_images: typeof data[0].other_images === 'string' 
-        ? JSON.parse(data[0].other_images) 
-        : (Array.isArray(data[0].other_images) ? data[0].other_images : [])
-    };
-
-    if (formattedData.id) {
-      setShops(shops.map(s => s.id === savedShop.id ? savedShop : s));
-      setSelectedShop(savedShop);
-    } else {
-      setShops([...shops, savedShop]);
-      setSelectedShop(savedShop);
-    }
-
-    setView("shops");
-  } catch (error: any) {
-    alert(t.errorSavingShop + ': ' + error.message);
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   const handleDeleteShop = async (shopId: number) => {
     if (!window.confirm(t.deleteShopConfirm)) return;
@@ -624,15 +624,15 @@ function ShopEditor({ shop, categories, onSave, onCancel, t }: any) {
 
   const extractLatLng = (embedCode: string) => {
     if (!embedCode) return { lat: null, lng: null };
-    
+
     const srcMatch = embedCode.match(/src="([^"]+)"/);
     if (!srcMatch) return { lat: null, lng: null };
-    
+
     const src = srcMatch[1];
-    
+
     const latMatch = src.match(/!3d([-\d.]+)/);
     const lngMatch = src.match(/!2d([-\d.]+)/);
-    
+
     return {
       lat: latMatch ? parseFloat(latMatch[1]) : null,
       lng: lngMatch ? parseFloat(lngMatch[1]) : null
@@ -869,12 +869,11 @@ function ShopEditor({ shop, categories, onSave, onCancel, t }: any) {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">{t.openingHours}</label>
-                  <input
-                    type="text"
+                  <textarea
                     name="opening_hours"
                     value={formData.opening_hours}
                     onChange={handleChange}
-                    className="w-full px-4 py-3 bg-white border border-gray-300 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    className="w-full h-60 px-4 py-3 bg-white border border-gray-300 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
                     placeholder={t.openingHoursPlaceholder}
                   />
                 </div>
