@@ -83,7 +83,6 @@ const shopTranslations = {
     errorSavingOffer: "Error saving offer",
     errorSavingRecommendation: "Error saving recommendation",
     noCategory: "No Category",
-    // NEW FIELDS
     websiteUrl: "Website URL",
     paymentMethod: "Payment Method",
     numberSeats: "Number of Seats"
@@ -167,7 +166,6 @@ const shopTranslations = {
     errorSavingOffer: "オファーの保存エラー",
     errorSavingRecommendation: "おすすめの保存エラー",
     noCategory: "カテゴリーなし",
-    // NEW FIELDS
     websiteUrl: "ウェブサイトURL",
     paymentMethod: "支払い方法",
     numberSeats: "座席数"
@@ -218,22 +216,33 @@ export default function ShopApp({ language = "en" }: ShopManagerProps) {
     }
   };
 
-  const fetchShops = async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabaseShop
-        .from('shops')
-        .select('*')
-        .order('name');
+const fetchShops = async () => {
+  setLoading(true);
+  try {
+    const { data, error } = await supabaseShop
+      .from('shops')
+      .select('*')
+      .order('name');
 
-      if (error) throw error;
-      setShops(data);
-    } catch (error: any) {
-      console.error('Error fetching shops:', error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+    if (error) throw error;
+
+    const safeData = data.map(shop => ({
+      ...shop,
+      other_images: typeof shop.other_images === 'string' 
+        ? JSON.parse(shop.other_images) 
+        : (Array.isArray(shop.other_images) ? shop.other_images : []),
+      website_url: shop.website_url || "",
+      payment_method: shop.payment_method || "",
+      number_seats: shop.number_seats || ""
+    }));
+
+    setShops(safeData);
+  } catch (error: any) {
+    console.error('Error fetching shops:', error.message);
+  } finally {
+    setLoading(false);
+  }
+};
 
   const fetchOffers = async () => {
     try {
@@ -269,10 +278,19 @@ export default function ShopApp({ language = "en" }: ShopManagerProps) {
     }
   };
 
-  const handleShopSelect = (shop: any) => {
-    setSelectedShop(shop);
-    setView("editShop");
+const handleShopSelect = (shop: any) => {
+  const safeShop = {
+    ...shop,
+    other_images: typeof shop.other_images === 'string' 
+      ? JSON.parse(shop.other_images) 
+      : (Array.isArray(shop.other_images) ? shop.other_images : []),
+    website_url: shop.website_url || "",
+    payment_method: shop.payment_method || "",
+    number_seats: shop.number_seats || ""
   };
+  setSelectedShop(safeShop);
+  setView("editShop");
+};
 
   const handleNewShop = () => {
     setSelectedShop({
@@ -298,56 +316,59 @@ export default function ShopApp({ language = "en" }: ShopManagerProps) {
     setView("editShop");
   };
 
-  const handleSaveShop = async (shopData: any) => {
-    setLoading(true);
-    try {
-     
-      const formattedData = {
-        ...shopData,
-        map_embed: shopData.map_embed || null,
-        latitude: shopData.latitude || null,
-        longitude: shopData.longitude || null,
-      };
-      if (formattedData.other_images) {
-        formattedData.other_images = JSON.stringify(formattedData.other_images);
-      }
+const handleSaveShop = async (shopData: any) => {
+  setLoading(true);
+  try {
+    const formattedData = {
+      ...shopData,
+      map_embed: shopData.map_embed || null,
+      latitude: shopData.latitude || null,
+      longitude: shopData.longitude || null,
+      // jsonb ফিল্ডে string পাঠাতে হবে
+      other_images: Array.isArray(shopData.other_images) 
+        ? JSON.stringify(shopData.other_images) 
+        : '[]'
+    };
 
-      if (formattedData.id) {
-        // Update
-        const { data, error } = await supabaseShop
-          .from('shops')
-          .update(formattedData)
-          .eq('id', formattedData.id)
-          .select();
+    let data, error;
 
-        if (error) throw error;
-
-        setShops(shops.map(shop =>
-          shop.id === formattedData.id ? { ...data[0], other_images: JSON.parse(data[0].other_images || '[]') } : shop
-        ));
-        setSelectedShop({ ...data[0], other_images: JSON.parse(data[0].other_images || '[]') });
-      } else {
-        // Insert
-        const { data, error } = await supabaseShop
-          .from('shops')
-          .insert([formattedData])
-          .select();
-
-        if (error) throw error;
-
-        const newShop = { ...data[0], other_images: JSON.parse(data[0].other_images || '[]') };
-        setShops([...shops, newShop]);
-        setSelectedShop(newShop);
-      }
-
-      setView("shops");
-    } catch (error: any) {
-      console.error('Error saving shop:', error.message);
-      alert(t.errorSavingShop + ': ' + error.message);
-    } finally {
-      setLoading(false);
+    if (formattedData.id) {
+      ({ data, error } = await supabaseShop
+        .from('shops')
+        .update(formattedData)
+        .eq('id', formattedData.id)
+        .select());
+    } else {
+      ({ data, error } = await supabaseShop
+        .from('shops')
+        .insert([formattedData])
+        .select());
     }
-  };
+
+    if (error) throw error;
+
+    const savedShop = {
+      ...data[0],
+      other_images: typeof data[0].other_images === 'string' 
+        ? JSON.parse(data[0].other_images) 
+        : (Array.isArray(data[0].other_images) ? data[0].other_images : [])
+    };
+
+    if (formattedData.id) {
+      setShops(shops.map(s => s.id === savedShop.id ? savedShop : s));
+      setSelectedShop(savedShop);
+    } else {
+      setShops([...shops, savedShop]);
+      setSelectedShop(savedShop);
+    }
+
+    setView("shops");
+  } catch (error: any) {
+    alert(t.errorSavingShop + ': ' + error.message);
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleDeleteShop = async (shopId: number) => {
     if (!window.confirm(t.deleteShopConfirm)) return;
@@ -586,12 +607,11 @@ function ShopList({ shops, categories, onShopSelect, onShopDelete, t }: any) {
   );
 }
 
-
 function ShopEditor({ shop, categories, onSave, onCancel, t }: any) {
   const [formData, setFormData] = useState({
     ...shop,
     category_id: shop.category_id || '',
-    other_images: shop.other_images || [],
+    other_images: Array.isArray(shop.other_images) ? shop.other_images : [],
     map_embed: shop.map_embed || '',
     opening_hours: shop.opening_hours || "",
     near_station: shop.near_station || "",
@@ -602,41 +622,41 @@ function ShopEditor({ shop, categories, onSave, onCancel, t }: any) {
   const [uploading, setUploading] = useState(false);
   const [uploadingOther, setUploadingOther] = useState(false);
 
- const extractLatLng = (embedCode: string) => {
-  if (!embedCode) return { lat: null, lng: null };
-  
-  const srcMatch = embedCode.match(/src="([^"]+)"/);
-  if (!srcMatch) return { lat: null, lng: null };
-  
-  const src = srcMatch[1];
-  
-  const latMatch = src.match(/!3d([-\d.]+)/);
-  const lngMatch = src.match(/!2d([-\d.]+)/);
-  
-  return {
-    lat: latMatch ? parseFloat(latMatch[1]) : null,
-    lng: lngMatch ? parseFloat(lngMatch[1]) : null
+  const extractLatLng = (embedCode: string) => {
+    if (!embedCode) return { lat: null, lng: null };
+    
+    const srcMatch = embedCode.match(/src="([^"]+)"/);
+    if (!srcMatch) return { lat: null, lng: null };
+    
+    const src = srcMatch[1];
+    
+    const latMatch = src.match(/!3d([-\d.]+)/);
+    const lngMatch = src.match(/!2d([-\d.]+)/);
+    
+    return {
+      lat: latMatch ? parseFloat(latMatch[1]) : null,
+      lng: lngMatch ? parseFloat(lngMatch[1]) : null
+    };
   };
-};
 
-const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-  const { name, value, type } = e.target as any;
-  const checked = (e.target as HTMLInputElement).checked;
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { name, value, type } = e.target as any;
+    const checked = (e.target as HTMLInputElement).checked;
 
-  setFormData((prev: any) => ({
-    ...prev,
-    [name]: type === 'checkbox' ? checked : value
-  }));
-
-  if (name === 'map_embed') {
-    const { lat, lng } = extractLatLng(value);
     setFormData((prev: any) => ({
       ...prev,
-      latitude: lat,
-      longitude: lng
+      [name]: type === 'checkbox' ? checked : value
     }));
-  }
-};
+
+    if (name === 'map_embed') {
+      const { lat, lng } = extractLatLng(value);
+      setFormData((prev: any) => ({
+        ...prev,
+        latitude: lat,
+        longitude: lng
+      }));
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -773,9 +793,9 @@ const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElemen
                     onChange={handleChange}
                     rows={4}
                     className="w-full h-96 px-4 py-3 bg-white border border-gray-300 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-
                   />
                 </div>
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">{t.websiteUrl}</label>
                   <input
@@ -796,7 +816,7 @@ const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElemen
                     value={formData.payment_method}
                     onChange={handleChange}
                     placeholder="Cash, Credit Card, Mobile Pay..."
-                    className="w-full h-72 px-4 py-3 bg-white border border-gray-300 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    className="w-full px-4 py-3 bg-white border border-gray-300 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                   />
                 </div>
 
@@ -813,6 +833,7 @@ const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElemen
                 </div>
               </div>
             </div>
+
             <div className="bg-white border border-gray-200 p-5 rounded-lg">
               <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-indigo-600" viewBox="0 0 20 20" fill="currentColor">
@@ -1058,7 +1079,6 @@ const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElemen
   );
 }
 
-/* ==================== OfferManager & RecommendationManager (Unchanged) ==================== */
 function OfferManager({ offers, shops, onSave, onDelete, t }: any) {
   const [selectedOffer, setSelectedOffer] = useState<any>(null);
   const [formData, setFormData] = useState({
