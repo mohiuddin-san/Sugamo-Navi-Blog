@@ -34,8 +34,8 @@ const shopTranslations = {
     address: "Address",
     nearStation: "Near Station",
     nearestStation: "Nearest station or landmark",
-    openingHours: "Opening Hours",
-    openingHoursPlaceholder: "e.g., 9:00 AM - 6:00 PM",
+    openingHours: "Short Description",
+    openingHoursPlaceholder: "short descreiption",
     googleMapsEmbed: "Google Maps Embed Code",
     pasteEmbedCode: "Paste the iframe embed code from Google Maps",
     extractedLocation: "Extracted location",
@@ -117,8 +117,8 @@ const shopTranslations = {
     address: "住所",
     nearStation: "最寄り駅",
     nearestStation: "最寄りの駅またはランドマーク",
-    openingHours: "営業時間",
-    openingHoursPlaceholder: "例: 9:00 AM - 6:00 PM",
+    openingHours: "簡単な説明",
+    openingHoursPlaceholder: "簡単な説明",
     googleMapsEmbed: "Google マップ埋め込みコード",
     pasteEmbedCode: "Google マップからiframe埋め込みコードを貼り付け",
     extractedLocation: "抽出された場所",
@@ -324,10 +324,9 @@ export default function ShopApp({ language = "en" }: ShopManagerProps) {
         map_embed: shopData.map_embed || null,
         latitude: shopData.latitude || null,
         longitude: shopData.longitude || null,
-        // jsonb ফিল্ডে string পাঠাতে হবে
         other_images: Array.isArray(shopData.other_images)
-          ? JSON.stringify(shopData.other_images)
-          : '[]'
+          ? shopData.other_images
+          : []
       };
 
       let data, error;
