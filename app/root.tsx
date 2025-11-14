@@ -29,7 +29,7 @@ export default function App() {
       </head>
       <body>
          <DeviceProvider>
-          <Outlet /> {/* এখানে সব route render হবে */}
+          <Outlet /> 
         </DeviceProvider>
         <ScrollRestoration />
         <Scripts />
