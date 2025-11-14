@@ -195,6 +195,7 @@ export default function ShopApp({ language = "en" }: ShopManagerProps) {
   const [loading, setLoading] = useState(false);
   const t = shopTranslations[language];
 
+
   useEffect(() => {
     fetchShops();
     fetchOffers();
@@ -621,6 +622,94 @@ function ShopEditor({ shop, categories, onSave, onCancel, t }: any) {
   const [uploading, setUploading] = useState(false);
   const [uploadingOther, setUploadingOther] = useState(false);
 
+  // === নতুন স্টেট ===
+  const [websiteEntries, setWebsiteEntries] = useState<Array<{ logo: string, url: string }>>([]);
+  const [newLogoUrl, setNewLogoUrl] = useState("");
+  const [newWebsiteUrl, setNewWebsiteUrl] = useState("");
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+
+  const uploadWebsiteLogo = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    try {
+      setUploadingLogo(true);
+      const file = e.target.files?.[0];
+      if (!file) throw new Error(t.mustSelectImage);
+
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${crypto.randomUUID()}.${fileExt}`;
+      const filePath = fileName; // ফোল্ডার ছাড়া
+
+      // Upload
+      const { error: uploadError } = await supabaseShop.storage
+        .from('webside-logo')
+        .upload(filePath, file, { upsert: false });
+
+      if (uploadError) throw uploadError;
+
+      // Get Public URL
+      const { data } = supabaseShop.storage
+        .from('webside-logo')
+        .getPublicUrl(filePath);
+
+      if (!data?.publicUrl) throw new Error("Public URL not generated");
+
+      console.log("Final Public URL:", data.publicUrl); // এই URL কাজ করবে
+      setNewLogoUrl(data.publicUrl);
+
+    } catch (error: any) {
+      alert(t.errorUploadingImage + ': ' + error.message);
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
+  const addWebsiteEntry = () => {
+    if (!newLogoUrl || !newWebsiteUrl) {
+      alert("Please select a logo and enter a website URL.");
+      return;
+    }
+
+    const newEntry = { logo: newLogoUrl, url: newWebsiteUrl };
+    const updated = [...websiteEntries, newEntry];
+    setWebsiteEntries(updated);
+    setFormData((prev: any) => ({
+      ...prev,
+      website_url: JSON.stringify(updated)
+    }));
+
+    // Reset inputs
+    setNewLogoUrl("");
+    setNewWebsiteUrl("");
+    (document.getElementById("logo-upload-input") as HTMLInputElement).value = "";
+  };
+
+  // === লোগো + URL মুছে ফেলা ===
+  const removeWebsiteEntry = (index: number) => {
+    const updated = websiteEntries.filter((_, i) => i !== index);
+    setWebsiteEntries(updated);
+    setFormData((prev: any) => ({
+      ...prev,
+      website_url: updated.length > 0 ? JSON.stringify(updated) : ""
+    }));
+  };
+
+  // === formData থেকে website_logos পার্স করা (edit mode) ===
+  useEffect(() => {
+    if (shop.website_url) {
+      try {
+        const parsed = JSON.parse(shop.website_url);
+        if (Array.isArray(parsed)) {
+          setWebsiteEntries(parsed);
+        }
+      } catch (e) {
+        // If not JSON, treat as single URL (backward compatibility)
+        if (shop.website_url.startsWith('http')) {
+          setWebsiteEntries([]);
+        }
+      }
+    } else {
+      setWebsiteEntries([]);
+    }
+  }, [shop.website_url]);
+
   const extractLatLng = (embedCode: string) => {
     if (!embedCode) return { lat: null, lng: null };
 
@@ -796,18 +885,55 @@ function ShopEditor({ shop, categories, onSave, onCancel, t }: any) {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">{t.websiteUrl}</label>
-                  <input
-                    type="url"
-                    name="website_url"
-                    value={formData.website_url}
-                    onChange={handleChange}
-                    placeholder="https://example.com"
-                    className="w-full px-4 py-3 bg-white border border-gray-300 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                  />
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Website Logos & URLs
+                  </label>
+
+                  {/* Existing entries */}
+                  {websiteEntries.map((entry, index) => (
+                    <div key={index} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                      <img src={entry.logo} alt="Logo" className="h-10 w-10 object-contain rounded" />
+                      <a href={entry.url} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline text-sm truncate max-w-xs">
+                        {entry.url}
+                      </a>
+                      <button type="button" onClick={() => removeWebsiteEntry(index)} className="ml-auto text-red-600 hover:text-red-700">
+                        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  ))}
+
+                  {/* Add new */}
+                  <div className="flex gap-3 items-end">
+                    <div className="flex-1">
+                      <label className="block text-xs text-gray-600 mb-1">Add Logo</label>
+                      <label className="cursor-pointer inline-flex items-center justify-center h-10 w-10 border-2 border-dashed border-gray-300 rounded-lg hover:border-indigo-400">
+                        {uploadingLogo ? (
+                          <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-indigo-600"></div>
+                        ) : newLogoUrl ? (
+                          <img src={newLogoUrl} alt="Selected" className="h-full w-full object-contain rounded" />
+                        ) : (
+                          <span className="text-gray-400 text-xl">+</span>
+                        )}
+                        <input id="logo-upload-input" type="file" accept="image/*" onChange={uploadWebsiteLogo} className="sr-only" />
+                      </label>
+                    </div>
+                    <div className="flex-1">
+                      <label className="block text-xs text-gray-600 mb-1">Website URL</label>
+                      <input type="url" value={newWebsiteUrl} onChange={(e) => setNewWebsiteUrl(e.target.value)} placeholder="https://example.com" className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                    </div>
+                    <button type="button" onClick={addWebsiteEntry} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg transition-colors">
+                      Add
+                    </button>
+                  </div>
+                  [image url, wensite url]
+                  <p className="mt-2 text-xs text-gray-500">
+                    Add multiple website logos with their URLs. Saved as JSON in Website URL field.
+                  </p>
                 </div>
 
-                <div>
+                {/* <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">{t.paymentMethod}</label>
                   <input
                     type="text"
@@ -829,7 +955,7 @@ function ShopEditor({ shop, categories, onSave, onCancel, t }: any) {
                     placeholder="e.g., 50"
                     className="w-full px-4 py-3 bg-white border border-gray-300 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                   />
-                </div>
+                </div> */}
               </div>
             </div>
 
